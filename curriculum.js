@@ -211,7 +211,7 @@ var CURRICULUM = {
             badge: "DECISION TREE",
             situation: { down: "2ND & 8", field: "OPP 40", score: "TIE 0-0", formation: "2x2" },
             defense: "cover2", routes: "smash",
-            question: "CORNER DRIVES TO THE FLAT AT THE SNAP. WHERE IS THE BALL?",
+            question: "CORNER DRIVES TO THE FLAT AT THE SNAP. WHAT IS YOUR THROW?",
             hint: "The corner went down and out. What space did he just vacate above him?",
             options: [
               "Corner route behind him — he vacated the hole shot window",
@@ -445,7 +445,7 @@ var CURRICULUM = {
             badge: "WEAKNESS",
             situation: { down: "3RD & 6", field: "OPP 30", score: "DOWN 3-10", formation: "2x2" },
             defense: "cover3", routes: "seam_dig",
-            question: "WHERE IS THE PRIMARY VOID IN COVER 3?",
+            question: "WHERE IS THE PRIMARY WEAK SPOT IN COVER 3?",
             hint: "Three defenders own the deep thirds. Four defend underneath. What is between those two levels?",
             options: [
               "The seam — between the corner's deep third and the safety's middle at 10-14 yards",
@@ -491,7 +491,7 @@ var CURRICULUM = {
             badge: "DECISION TREE",
             situation: { down: "2ND & 8", field: "OPP 42", score: "TIE 0-0", formation: "2x2" },
             defense: "cover3", routes: "curl_flat",
-            question: "CURL-FLAT DEFENDER WIDENS TO THE FLAT. WHERE IS THE BALL?",
+            question: "CURL-FLAT DEFENDER WIDENS TO THE FLAT. WHAT IS YOUR THROW?",
             hint: "He went outside. What did he leave open behind him?",
             options: [
               "The curl — he widened and left that zone open at 12-15 yards",
@@ -513,7 +513,7 @@ var CURRICULUM = {
             badge: "PLAY CALL",
             situation: { down: "3RD & 9", field: "OWN 38", score: "DOWN 10-17", formation: "EMPTY" },
             defense: "cover3", routes: "four_verts",
-            question: "EMPTY — 3RD AND 9 — COVER 3 — MUST CONVERT",
+            question: "EMPTY — 3RD AND 9 — COVER 3 — WHAT IS THE CALL?",
             hint: "Five receivers, three deep zones. What stresses all three simultaneously?",
             options: [
               "Four verticals — the single safety cannot help everywhere",
@@ -557,7 +557,7 @@ var CURRICULUM = {
             badge: "TRIPS READ",
             situation: { down: "2ND & 7", field: "OPP 45", score: "TIE 7-7", formation: "TRIPS RT" },
             defense: "cover3_trips", routes: "trips_post",
-            question: "TRIPS VS COVER 3 — SAFETY WENT TO THE FIELD — WHERE IS THE BALL?",
+            question: "TRIPS VS COVER 3 — SAFETY WENT TO THE FIELD — WHAT IS YOUR THROW?",
             hint: "The safety left the boundary. That corner is now alone. What route exploits that?",
             options: [
               "Backside post — boundary corner is isolated with no safety help",
@@ -747,7 +747,7 @@ var CURRICULUM = {
             badge: "ROBBER",
             situation: { down: "1ST & 10", field: "OWN 25", score: "TIE 7-7", formation: "2x2" },
             defense: "cover1_robber", routes: null,
-            question: "WHAT IS COVER 1 ROBBER AND WHY DOES IT CHANGE YOUR ATTACK?",
+            question: "WHAT IS COVER 1 ROBBER AND WHAT DOES IT TAKE AWAY?",
             hint: "One linebacker is not matched on a receiver. Where is he and what is he doing?",
             options: [
               "The Mike drops into a short middle zone to steal crossers and slants — making inside throws dangerous",
@@ -1221,7 +1221,7 @@ var CURRICULUM = {
             badge: "ATTACK IT",
             situation: { down: "1ST & 10", field: "OWN 35", score: "TIE 0-0", formation: "2x2" },
             defense: "cover2", routes: null,
-            question: "EVEN FRONT — WHAT DOES THE QB USE THE PREDICTABLE RUSH FOR?",
+            question: "EVEN FRONT — HOW DOES A PREDICTABLE RUSH HELP THE QB?",
             hint: "You know who is rushing. What does that clarity give you?",
             options: [
               "Set the line fast, trust protection, focus entirely on the coverage read",
@@ -1345,7 +1345,7 @@ var CURRICULUM = {
             badge: "WEAKNESS",
             situation: { down: "1ST & 10", field: "OWN 25", score: "TIE 0-0", formation: "2x2" },
             defense: "cover1", routes: null,
-            question: "WHERE CAN THE ODD FRONT STRUGGLE?",
+            question: "WHAT RUN CONCEPT STRESSES THE ODD FRONT?",
             hint: "Three interior linemen versus five offensive linemen. What does that create?",
             options: [
               "Power run game — three interior linemen can be outnumbered at the point of attack",

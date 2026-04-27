@@ -164,17 +164,28 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:0 32px
 .opt::after{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:transparent;transition:background .15s;}
 .opt:hover:not(:disabled)::after{background:var(--blue);}
 .opt:hover:not(:disabled){background:var(--gray2);border-color:var(--border2);}
-.opt.correct{background:rgba(178,255,0,0.07);border-color:var(--green);color:var(--green);}
-.opt.correct::after{background:var(--green);}
-.opt.wrong{background:rgba(255,4,0,0.07);border-color:var(--red);color:var(--red);}
-.opt.wrong::after{background:var(--red);}
+.opt.tier-best{background:rgba(178,255,0,0.07);border-color:var(--green);}
+.opt.tier-best::after{background:var(--green);}
+.opt.tier-ok{background:rgba(255,170,0,0.07);border-color:#ffaa00;}
+.opt.tier-ok::after{background:#ffaa00;}
+.opt.tier-wrong{background:rgba(255,4,0,0.06);border-color:rgba(255,4,0,0.4);}
+.opt.tier-wrong::after{background:var(--red);}
+.opt.picked{box-shadow:0 0 0 2px var(--white);}
 .opt:disabled{cursor:not-allowed;}
 .opt-ltr{font-family:'Anton',sans-serif;font-size:18px;opacity:.15;flex-shrink:0;transition:opacity .15s;line-height:1;margin-top:-1px;}
-.opt:hover .opt-ltr,.opt.correct .opt-ltr,.opt.wrong .opt-ltr{opacity:.85;}
+.opt.tier-best .opt-ltr,.opt.tier-ok .opt-ltr,.opt.tier-wrong .opt-ltr{opacity:.7;}
+.opt-txt{flex:1;line-height:1.4;}
+.opt-note{margin-top:8px;font-size:10px;color:rgba(255,255,255,0.38);font-weight:400;letter-spacing:0;text-transform:none;line-height:1.5;border-top:1px solid var(--border);padding-top:7px;}
+.opt-tier-tag{font-family:'Roboto Mono',monospace;font-size:8px;font-weight:700;letter-spacing:1.5px;padding:2px 5px;margin-right:5px;border:1px solid;}
+.opt-tier-tag.best{color:var(--green);border-color:rgba(178,255,0,0.4);}
+.opt-tier-tag.ok{color:#ffaa00;border-color:rgba(255,170,0,0.4);}
+.opt-tier-tag.wrong{color:var(--red);border-color:rgba(255,4,0,0.3);}
+.q-directive{font-family:'Roboto Mono',monospace;font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--green);margin-bottom:6px;}
 
 /* FEEDBACK */
 .feedback{background:var(--gray);border:1px solid var(--border);border-left:3px solid var(--green);padding:16px 20px;margin-bottom:16px;display:none;animation:fadeUp .3s ease;}
-.feedback.wrong{border-left-color:var(--red);}
+.feedback.partial{border-left-color:#ffaa00;}
+.feedback.partial .fb-title{color:#ffaa00;}
 .feedback.show{display:block;}
 .fb-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:6px;}
 .fb-title{font-family:'Roboto Mono',monospace;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--green);}
@@ -356,6 +367,7 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:0 32px
     <div class="q-badge" id="qBadge">READ</div>
     <div class="q-text" id="qTxt">LOADING...</div>
     <div class="q-hint" id="qHint"></div>
+    <div class="q-directive" id="qDirective">SELECT THE BEST ANSWER</div>
   </div>
   <div class="opts" id="optsGrid"></div>
 

@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Locker Room — Signal Caller</title>
+<link rel="stylesheet" href="css/sparkqb.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+.locker-wrap { max-width: 800px; margin: 0 auto; padding: 24px; }
+.overall-card {
+  background: var(--gray1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 16px;
+}
+.overall-num {
+  font-family: 'Anton', sans-serif;
+  font-size: 80px;
+  color: var(--green);
+  line-height: 1;
+  flex-shrink: 0;
+  min-width: 100px;
+  text-align: center;
+}
+.overall-info { flex: 1; }
+.overall-name { font-family: 'Anton', sans-serif; font-size: 28px; margin-bottom: 2px; }
+.overall-rank {
+  font-family: 'Roboto Mono', monospace; font-size: 10px;
+  text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--green); margin-bottom: 12px;
+}
+.xp-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.xp-label { font-family: 'Roboto Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+
+.scout-card {
+  background: var(--gray2);
+  border-left: 3px solid var(--red);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.scout-eyebrow { font-family: 'Roboto Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--red); margin-bottom: 6px; }
+.scout-text { font-size: 14px; color: var(--text-secondary); line-height: 1.6; }
+
+.mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+.mode-card {
+  background: var(--gray1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  cursor: pointer;
+  text-decoration: none;
+  color: var(--white);
+  transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+}
+.mode-card:hover { border-color: var(--green); background: var(--gray2); transform: translateY(-1px); }
+.mode-icon { font-size: 28px; margin-bottom: 12px; }
+.mode-title { font-family: 'Anton', sans-serif; font-size: 20px; margin-bottom: 4px; }
+.mode-sub { font-family: 'Roboto Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+
+.badges-section { margin-bottom: 20px; }
+.badges-wrap { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+
+.recent-section {}
+.recent-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.recent-row:last-child { border-bottom: none; }
+.recent-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.recent-dot.correct { background: var(--green); }
+.recent-dot.wrong { background: var(--red); }
+.recent-coverage { font-family: 'Roboto Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-secondary); width: 120px; flex-shrink: 0; }
+.recent-result { color: var(--text-muted); flex: 1; }
+.recent-time { font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--text-muted); }
+
+.admin-link {
+  display: flex; align-items: center; justify-content: space-between;
+  background: rgba(0,79,255,0.08);
+  border: 1px solid rgba(0,79,255,0.25);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  text-decoration: none;
+  color: var(--white);
+  margin-bottom: 16px;
+  transition: all 0.2s;
+}
+.admin-link:hover { background: rgba(0,79,255,0.14); border-color: rgba(0,79,255,0.4); }
+.admin-link-text { font-family: 'Roboto Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: #6699ff; }
+.admin-link-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+@media (max-width: 520px) {
+  .overall-card { flex-direction: column; text-align: center; }
+  .mode-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<nav class="nav">
+  <a href="locker-room.html" class="nav-logo">
+    <div class="nav-logomark"></div>
+    <div class="nav-wordmark">Spark<span>QB</span></div>
+  </a>
+  <div class="nav-badge">Signal Caller</div>
+  <div class="nav-spacer"></div>
+  <span class="nav-user" id="nav-user"></span>
+  <button class="btn btn-sm" onclick="signOut()">Sign Out</button>
+</nav>
+
+<div class="locker-wrap">
+  <div id="loading" class="loading"><div class="spinner"></div>Loading locker room...</div>
+  <div id="content" class="hidden">
+
+    <div class="eyebrow eyebrow-green mb-8">Locker Room</div>
+    <h2 class="mb-16" id="greeting">Welcome back</h2>
+
+    <div class="overall-card">
+      <div class="overall-num" id="lr-overall">60</div>
+      <div class="overall-info">
+        <div class="overall-name" id="lr-name">Signal Caller</div>
+        <div class="overall-rank" id="lr-rank">Scout Team</div>
+        <div class="xp-row">
+          <div class="xp-label" id="lr-xp-label">0 / 1000 XP to next rank</div>
+          <div class="xp-label" id="lr-xp-pct">0%</div>
+        </div>
+        <div class="progress-wrap">
+          <div class="progress-fill green" id="lr-xp-bar" style="width:0%"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb-16">
+      <div class="eyebrow mb-12">Attributes</div>
+      <div id="attrs-list"></div>
+    </div>
+
+    <div class="scout-card">
+      <div class="scout-eyebrow">Today's Scouting Report</div>
+      <div class="scout-text" id="scout-text">Loading your scouting report...</div>
+    </div>
+
+    <div id="admin-section" class="hidden">
+      <a href="admin.html" class="admin-link">
+        <div>
+          <div class="admin-link-text">Admin Dashboard</div>
+          <div class="admin-link-sub">Manage formations, players, and curriculum</div>
+        </div>
+        <div style="color:#6699ff;font-size:18px">→</div>
+      </a>
+    </div>
+
+    <div class="mode-grid">
+      <a href="game.html?mode=quickreps" class="mode-card">
+        <div class="mode-icon">⚡</div>
+        <div class="mode-title">Quick Reps</div>
+        <div class="mode-sub">10 plays · ID the coverage · Daily habit</div>
+      </a>
+      <a href="game.html?mode=drive" class="mode-card">
+        <div class="mode-icon">🏈</div>
+        <div class="mode-title">Drive Mode</div>
+        <div class="mode-sub">Call plays · Score TDs · Full progression</div>
+      </a>
+    </div>
+
+    <div class="badges-section card mb-16">
+      <div class="eyebrow mb-4">Badges</div>
+      <div class="badges-wrap" id="badges-wrap"></div>
+    </div>
+
+    <div class="card">
+      <div class="eyebrow mb-12">Recent Activity</div>
+      <div id="recent-list">
+        <div class="text-muted" style="font-size:13px;padding:12px 0">No recent activity yet. Start with Quick Reps!</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="js/supabase.js"></script>
+<script>
+const RANKS = [
+  {min:60,label:'Scout Team'},{min:65,label:'Practice Squad'},
+  {min:70,label:'Backup'},{min:75,label:'Starter'},
+  {min:80,label:'Captain'},{min:85,label:'Signal Caller'},
+  {min:90,label:'Elite'},{min:95,label:'Legend'}
+];
+const ATTRS = [
+  {key:'attr_coverage_iq',label:'Coverage IQ',color:'blue'},
+  {key:'attr_processing_speed',label:'Processing Speed',color:'green'},
+  {key:'attr_decision_making',label:'Decision Making',color:'blue'},
+  {key:'attr_blitz_recognition',label:'Blitz Recognition',color:'red'}
+];
+const BADGES_DEF = [
+  {id:'coverage_rookie',label:'Coverage Rookie',desc:'Complete first Quick Reps session'},
+  {id:'blitz_buster',label:'Blitz Buster',desc:'ID Cover 0 correctly 5 times in a row'},
+  {id:'ice_veins',label:'Ice Veins',desc:'Score TD drive with sub-2s avg reaction'},
+  {id:'film_nerd',label:'Film Nerd',desc:'Complete 10 sessions'},
+  {id:'signal_caller',label:'Signal Caller',desc:'Reach 85 overall'},
+  {id:'legend',label:'Legend',desc:'Reach 95 overall'},
+];
+
+function getRank(overall) {
+  let rank = 'Scout Team';
+  for (const r of RANKS) { if (overall >= r.min) rank = r.label; }
+  return rank;
+}
+
+async function init() {
+  const user = await requireAuth();
+  if (!user) return;
+  document.getElementById('nav-user').textContent = user.email;
+
+  const profile = await getProfile(user.id);
+  if (!profile) { window.location.href = 'index.html'; return; }
+
+  document.getElementById('loading').classList.add('hidden');
+  document.getElementById('content').classList.remove('hidden');
+
+  const name = profile.full_name || 'Signal Caller';
+  const firstName = name.split(' ')[0];
+  document.getElementById('greeting').textContent = `Welcome back, ${firstName}`;
+  document.getElementById('lr-name').textContent = name;
+  document.getElementById('lr-overall').textContent = profile.overall;
+  document.getElementById('lr-rank').textContent = getRank(profile.overall);
+
+  const xpPct = Math.min(100, (profile.xp % 1000) / 10);
+  document.getElementById('lr-xp-bar').style.width = xpPct + '%';
+  document.getElementById('lr-xp-pct').textContent = Math.round(xpPct) + '%';
+  const nextRank = RANKS.find(r => r.min > profile.overall) || { label: 'Max Rank' };
+  document.getElementById('lr-xp-label').textContent = `${profile.xp % 1000} / 1000 XP to ${nextRank.label}`;
+
+  const attrsList = document.getElementById('attrs-list');
+  ATTRS.forEach(a => {
+    const val = profile[a.key] || 60;
+    attrsList.innerHTML += `
+      <div class="attr-row">
+        <div class="attr-name">${a.label}</div>
+        <div class="attr-val" style="color:var(--${a.color === 'blue' ? 'blue' : a.color === 'red' ? 'red' : 'green'})">${val}</div>
+        <div class="attr-bar"><div class="attr-fill" style="width:${val}%;background:var(--${a.color === 'blue' ? 'blue' : a.color === 'red' ? 'red' : 'green'})"></div></div>
+      </div>`;
+  });
+
+  const lowestAttr = ATTRS.reduce((a, b) => (profile[a.key] || 60) < (profile[b.key] || 60) ? a : b);
+  document.getElementById('scout-text').innerHTML =
+    `Your biggest weakness right now: <strong>${lowestAttr.label} (${profile[lowestAttr.key] || 60})</strong>. Today's sessions will prioritize coverages tied to this skill. Study the pre-snap keys before the snap.`;
+
+  if (profile.is_admin) document.getElementById('admin-section').classList.remove('hidden');
+
+  const earned = profile.badges ? JSON.parse(profile.badges) : [];
+  if (earned.includes('coverage_rookie')) { /* mark first badge */ }
+  if (profile.overall >= 85) earned.push('signal_caller');
+  if (profile.overall >= 95) earned.push('legend');
+  const badgesWrap = document.getElementById('badges-wrap');
+  BADGES_DEF.forEach(b => {
+    const isEarned = earned.includes(b.id);
+    badgesWrap.innerHTML += `<div class="badge ${isEarned ? 'badge-green' : ''}" title="${b.desc}">${isEarned ? '✓ ' : ''}${b.label}</div>`;
+  });
+
+  const { data: attempts } = await db.from('attempts')
+    .select('coverage_id, correct, created_at')
+    .eq('player_id', user.id)
+    .order('created_at', { ascending: false })
+    .limit(8);
+  if (attempts && attempts.length > 0) {
+    const recentList = document.getElementById('recent-list');
+    recentList.innerHTML = attempts.map(a => `
+      <div class="recent-row">
+        <div class="recent-dot ${a.correct ? 'correct' : 'wrong'}"></div>
+        <div class="recent-coverage">${a.coverage_id || 'Coverage'}</div>
+        <div class="recent-result">${a.correct ? 'Correct read' : 'Missed read'}</div>
+        <div class="recent-time">${timeAgo(a.created_at)}</div>
+      </div>`).join('');
+  }
+}
+
+function timeAgo(ts) {
+  const diff = Date.now() - new Date(ts).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+async function signOut() {
+  await db.auth.signOut();
+  window.location.href = 'index.html';
+}
+
+init();
+</script>
+</body>
+</html>

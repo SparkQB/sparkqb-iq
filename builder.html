@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Formation Builder — Signal Caller</title>
+<link rel="stylesheet" href="css/sparkqb.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+.builder-layout { display: flex; height: calc(100vh - 57px); overflow: hidden; }
+.builder-sidebar { width: 300px; flex-shrink: 0; background: var(--gray1); border-right: 1px solid var(--border); overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.builder-main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; background: var(--black); overflow: auto; }
+.builder-canvas-wrap { position: relative; width: 100%; max-width: 960px; user-select: none; }
+.builder-canvas-img { width: 100%; height: auto; display: block; border-radius: var(--radius-lg); border: 1px solid var(--border); }
+.builder-overlay { position: absolute; inset: 0; border-radius: var(--radius-lg); }
+.dot { position: absolute; border-radius: 50%; cursor: pointer; transform: translate(-50%, -50%); display: flex; align-items: center; justify-content: center; transition: box-shadow 0.15s; z-index: 10; }
+.dot:hover { box-shadow: 0 0 0 3px rgba(255,255,255,0.3); }
+.dot.selected { box-shadow: 0 0 0 3px var(--green); z-index: 20; }
+.dot-label { position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin-top: 3px; font-family: 'Roboto Mono', monospace; font-size: 8px; text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; pointer-events: none; text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
+.dot-lineman { opacity: 0.35; cursor: move; }
+.dot-delete { position: absolute; top: -6px; right: -6px; width: 14px; height: 14px; background: var(--red); border-radius: 50%; display: none; align-items: center; justify-content: center; font-size: 8px; cursor: pointer; color: white; z-index: 30; }
+.dot.selected .dot-delete { display: flex; }
+
+.dot-popup { position: absolute; background: var(--gray1); border: 1px solid var(--border-md); border-radius: var(--radius-md); padding: 12px; z-index: 100; min-width: 180px; box-shadow: 0 8px 32px rgba(0,0,0,0.6); }
+.dot-popup-title { font-family: 'Roboto Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 8px; }
+
+.tool-btn { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--gray2); border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; font-family: 'Roboto Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-secondary); transition: all 0.15s; width: 100%; }
+.tool-btn:hover { border-color: var(--border-md); color: var(--white); }
+.tool-btn.active { border-color: var(--green); color: var(--green); background: rgba(178,255,0,0.06); }
+.tool-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+
+.section-title { font-family: 'Roboto Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+
+.builder-instructions { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); background: rgba(16,18,20,0.9); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 8px 16px; font-family: 'Roboto Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); white-space: nowrap; pointer-events: none; }
+
+.save-status { font-family: 'Roboto Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); text-align: center; margin-top: 8px; }
+
+/* Route canvas */
+#route-canvas { position: absolute; inset: 0; pointer-events: none; border-radius: var(--radius-lg); }
+
+@media (max-width: 768px) {
+  .builder-layout { flex-direction: column; height: auto; }
+  .builder-sidebar { width: 100%; height: auto; overflow-y: visible; }
+  .builder-main { padding: 12px; }
+}
+</style>
+</head>
+<body>
+<nav class="nav">
+  <a href="admin.html" class="nav-logo">
+    <div class="nav-logomark"></div>
+    <div class="nav-wordmark">Spark<span>QB</span></div>
+  </a>
+  <div class="nav-badge">Formation Builder</div>
+  <div class="nav-spacer"></div>
+  <span class="mono" style="font-size:9px;color:var(--text-muted)" id="save-indicator">Unsaved</span>
+  <button class="btn btn-sm btn-primary" onclick="saveFormation()">Save →</button>
+  <a href="admin.html" class="btn btn-sm">Back</a>
+</nav>
+
+<div class="builder-layout">
+  <!-- SIDEBAR -->
+  <div class="builder-sidebar">
+
+    <div>
+      <div class="section-title mb-8">Formation Details</div>
+      <div class="form-group">
+        <label class="form-label">Formation Name</label>
+        <input type="text" class="form-input" id="f-name" placeholder="e.g. Cover 2 vs Trips Left">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Coverage</label>
+        <select class="form-select" id="f-coverage">
+          <option value="">Select Coverage</option>
+          <option>Cover 2</option><option>Cover 3</option><option>Cover 4</option>
+          <option>Cover 6</option><option>PALMS</option><option>Man Free (Cover 1)</option>
+          <option>Cover 0</option><option>2-Man</option><option>Tampa 2</option>
+          <option>Cover 3 Cloud</option><option>Cover 3 Buzz</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Front</label>
+        <select class="form-select" id="f-front" onchange="applyFront(this.value)">
+          <option value="">Select Front</option>
+          <option>4-3</option><option>3-4</option><option>Nickel</option>
+          <option>Dime</option><option>Bear</option><option>Eagle</option>
+          <option>Okie</option><option>Stack</option><option>4-2-5</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Offensive Personnel</label>
+        <select class="form-select" id="f-personnel" onchange="applyPersonnel(this.value)">
+          <option value="">Select Personnel</option>
+          <option>11 (3 WR, 1 TE, 1 RB)</option>
+          <option>12 (2 WR, 2 TE, 1 RB)</option>
+          <option>10 / Empty (4-5 WR)</option>
+          <option>21 (2 WR, 1 TE, 2 RB)</option>
+          <option>20 (3 WR, 0 TE, 2 RB)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Difficulty</label>
+        <select class="form-select" id="f-difficulty">
+          <option value="beginner">Beginner</option>
+          <option value="intermediate">Intermediate</option>
+          <option value="advanced">Advanced</option>
+          <option value="elite">Elite</option>
+        </select>
+      </div>
+    </div>
+
+    <hr class="divider" style="margin:4px 0">
+
+    <div>
+      <div class="section-title mb-8">Add Skill Position</div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <div class="section-title" style="font-size:8px;margin-top:6px;margin-bottom:4px;border:none;color:rgba(178,255,0,0.6)">OFFENSE</div>
+        <button class="tool-btn" onclick="selectDotType('QB','#B2FF00','offense')"><div class="tool-dot" style="background:#B2FF00"></div>QB</button>
+        <button class="tool-btn" onclick="selectDotType('WR','#004FFF','offense')"><div class="tool-dot" style="background:#004FFF"></div>WR</button>
+        <button class="tool-btn" onclick="selectDotType('RB','#004FFF','offense')"><div class="tool-dot" style="background:#004FFF"></div>RB</button>
+        <button class="tool-btn" onclick="selectDotType('TE','#004FFF','offense')"><div class="tool-dot" style="background:#004FFF"></div>TE</button>
+        <button class="tool-btn" onclick="selectDotType('Slot','#004FFF','offense')"><div class="tool-dot" style="background:#004FFF"></div>Slot / H-Back</button>
+        <div class="section-title" style="font-size:8px;margin-top:10px;margin-bottom:4px;border:none;color:rgba(255,4,0,0.6)">DEFENSE</div>
+        <button class="tool-btn" onclick="selectDotType('CB','#FF0400','defense')"><div class="tool-dot" style="background:#FF0400"></div>CB</button>
+        <button class="tool-btn" onclick="selectDotType('FS','#FF0400','defense')"><div class="tool-dot" style="background:#FF0400"></div>FS</button>
+        <button class="tool-btn" onclick="selectDotType('SS','#FF0400','defense')"><div class="tool-dot" style="background:#FF0400"></div>SS</button>
+        <button class="tool-btn" onclick="selectDotType('OLB','#FF8C00','defense')"><div class="tool-dot" style="background:#FF8C00"></div>OLB</button>
+        <button class="tool-btn" onclick="selectDotType('MLB','#FF8C00','defense')"><div class="tool-dot" style="background:#FF8C00"></div>MLB</button>
+        <button class="tool-btn" onclick="selectDotType('LB','#FF8C00','defense')"><div class="tool-dot" style="background:#FF8C00"></div>LB</button>
+        <button class="tool-btn" onclick="selectDotType('N','#FF8C00','defense')"><div class="tool-dot" style="background:#FF8C00"></div>Nickel</button>
+        <button class="tool-btn" onclick="selectDotType('D','#FF8C00','defense')"><div class="tool-dot" style="background:#FF8C00"></div>Dime</button>
+      </div>
+    </div>
+
+    <hr class="divider" style="margin:4px 0">
+
+    <div>
+      <div class="section-title mb-8">Toggles</div>
+      <label class="form-toggle mb-8">
+        <input type="checkbox" id="tog-blitz" onchange="toggleBlitz()">
+        <div class="toggle-track"></div>
+        <span class="toggle-label">Blitz Package</span>
+      </label>
+      <div id="blitz-type-wrap" class="hidden">
+        <select class="form-select" id="f-blitz-type" style="margin-bottom:8px">
+          <option>A-Gap Blitz</option><option>Edge Blitz</option><option>Safety Blitz</option>
+          <option>Corner Blitz</option><option>Overload Blitz</option><option>Zone Blitz</option>
+        </select>
+      </div>
+      <label class="form-toggle mb-8">
+        <input type="checkbox" id="tog-routes">
+        <div class="toggle-track"></div>
+        <span class="toggle-label">Routes Included</span>
+      </label>
+      <label class="form-toggle">
+        <input type="checkbox" id="tog-disguise">
+        <div class="toggle-track"></div>
+        <span class="toggle-label">Disguised Look</span>
+      </label>
+    </div>
+
+    <hr class="divider" style="margin:4px 0">
+
+    <div>
+      <div class="section-title mb-8">Film Review Notes</div>
+      <textarea class="form-textarea" id="f-film-notes" placeholder="What should the QB see and understand from this formation? This text appears in the film review after a wrong answer."></textarea>
+    </div>
+
+    <button class="btn btn-primary btn-full" onclick="saveFormation()">Save Formation →</button>
+    <button class="btn btn-full" onclick="clearCanvas()">Clear Canvas</button>
+    <div class="save-status" id="save-status"></div>
+
+  </div>
+
+  <!-- CANVAS -->
+  <div class="builder-main">
+    <div class="builder-canvas-wrap" id="canvas-wrap">
+      <img src="assets/field.png" class="builder-canvas-img" id="field-img" alt="Football field">
+      <canvas id="route-canvas"></canvas>
+      <div class="builder-overlay" id="overlay" onclick="handleCanvasClick(event)"></div>
+      <div class="builder-instructions" id="instructions">Select a position type from the sidebar, then click to place a dot</div>
+    </div>
+    <div style="margin-top:10px;font-family:'Roboto Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);text-align:center">
+      Click to place · Drag to move · Click placed dot to select · Double-click dot for options
+    </div>
+  </div>
+</div>
+
+<!-- DOT OPTIONS POPUP -->
+<div class="dot-popup hidden" id="dot-popup">
+  <div class="dot-popup-title" id="popup-title">Dot Options</div>
+  <div class="form-group" id="popup-route-group">
+    <label class="form-label">Route</label>
+    <select class="form-select" id="popup-route" onchange="setDotRoute(this.value)" style="font-size:10px;padding:8px 10px">
+      <option value="">No route</option>
+      <option>Hitch</option><option>Slant</option><option>Curl</option><option>Out</option>
+      <option>In / Dig</option><option>Post</option><option>Corner</option><option>Fade</option>
+      <option>Seam / Vertical</option><option>Flat / Arrow</option><option>Swing</option>
+      <option>Wheel</option><option>Cross / Shallow</option><option>Comeback</option>
+      <option>Custom</option>
+    </select>
+  </div>
+  <div class="form-group" id="popup-read-group">
+    <label class="form-label">Read Order</label>
+    <select class="form-select" id="popup-read" onchange="setDotRead(this.value)" style="font-size:10px;padding:8px 10px">
+      <option value="">Not in progression</option>
+      <option value="1">1st Read</option>
+      <option value="2">2nd Read</option>
+      <option value="3">3rd Read / Checkdown</option>
+      <option value="hot">Hot Route</option>
+    </select>
+  </div>
+  <div class="form-group">
+    <label class="form-label">Note</label>
+    <input type="text" class="form-input" id="popup-note" placeholder="Coaching note for this receiver" style="font-size:12px;padding:8px 10px" oninput="setDotNote(this.value)">
+  </div>
+  <div id="popup-blitz-group" class="hidden">
+    <label class="form-toggle">
+      <input type="checkbox" id="popup-blitz" onchange="setDotBlitz(this.checked)">
+      <div class="toggle-track"></div>
+      <span class="toggle-label">Blitzing</span>
+    </label>
+  </div>
+  <div style="margin-top:8px;display:flex;gap:6px">
+    <button class="btn btn-sm btn-danger" onclick="deleteSelectedDot()">Delete</button>
+    <button class="btn btn-sm" onclick="closePopup()">Done</button>
+  </div>
+</div>
+
+<script src="js/supabase.js"></script>
+<script>
+let dots = [];
+let selectedDotType = null;
+let selectedDotColor = null;
+let selectedDotSide = null;
+let selectedDotId = null;
+let dragDot = null;
+let dragOffset = { x: 0, y: 0 };
+let formationId = null;
+
+const DOT_COLORS = { QB:'#B2FF00', WR:'#004FFF', RB:'#004FFF', TE:'#004FFF', Slot:'#004FFF', CB:'#FF0400', FS:'#FF0400', SS:'#FF0400', OLB:'#FF8C00', MLB:'#FF8C00', LB:'#FF8C00', N:'#FF8C00', D:'#FF8C00' };
+
+function uid() { return Math.random().toString(36).substr(2, 9); }
+
+function selectDotType(type, color, side) {
+  selectedDotType = type;
+  selectedDotColor = color;
+  selectedDotSide = side;
+  document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+  document.getElementById('instructions').textContent = `Click the field to place a ${type}`;
+  closePopup();
+  deselectDot();
+}
+
+function handleCanvasClick(e) {
+  if (!selectedDotType) return;
+  if (e.target.classList.contains('dot') || e.target.closest('.dot')) return;
+  const wrap = document.getElementById('canvas-wrap');
+  const rect = wrap.getBoundingClientRect();
+  const xPct = (e.clientX - rect.left) / rect.width;
+  const yPct = (e.clientY - rect.top) / rect.height;
+  placeDot(xPct, yPct, selectedDotType, selectedDotColor, selectedDotSide, false);
+  markUnsaved();
+}
+
+function placeDot(xPct, yPct, type, color, side, isLineman, id, extraData) {
+  const dotId = id || uid();
+  const dot = {
+    id: dotId, x: xPct, y: yPct,
+    type, color: color || DOT_COLORS[type] || '#ffffff',
+    side: side || 'offense',
+    isLineman: isLineman || false,
+    route: extraData?.route || '',
+    read: extraData?.read || '',
+    note: extraData?.note || '',
+    isBlitzing: extraData?.isBlitzing || false
+  };
+  dots.push(dot);
+  renderDot(dot);
+  return dot;
+}
+
+function renderDot(dot) {
+  const existing = document.getElementById('dot-' + dot.id);
+  if (existing) existing.remove();
+  const wrap = document.getElementById('canvas-wrap');
+  const size = dot.isLineman ? 16 : 22;
+  const el = document.createElement('div');
+  el.id = 'dot-' + dot.id;
+  el.className = 'dot' + (dot.isLineman ? ' dot-lineman' : '');
+  el.style.cssText = `left:${dot.x*100}%;top:${dot.y*100}%;width:${size}px;height:${size}px;background:${dot.color};border:2px solid rgba(255,255,255,0.3);`;
+  if (!dot.isLineman) {
+    const label = document.createElement('div');
+    label.className = 'dot-label';
+    label.style.color = dot.color;
+    label.textContent = dot.type;
+    el.appendChild(label);
+    const delBtn = document.createElement('div');
+    delBtn.className = 'dot-delete';
+    delBtn.textContent = '×';
+    delBtn.onclick = (e) => { e.stopPropagation(); removeDot(dot.id); };
+    el.appendChild(delBtn);
+    el.ondblclick = (e) => { e.stopPropagation(); openPopup(dot.id, e); };
+  }
+  el.onclick = (e) => { e.stopPropagation(); selectDot(dot.id); };
+  el.onmousedown = (e) => startDrag(e, dot.id);
+  wrap.appendChild(el);
+  if (dot.isBlitzing) drawBlitzArrow(dot);
+}
+
+function selectDot(id) {
+  deselectDot();
+  selectedDotId = id;
+  const el = document.getElementById('dot-' + id);
+  if (el) el.classList.add('selected');
+}
+
+function deselectDot() {
+  if (selectedDotId) {
+    const el = document.getElementById('dot-' + selectedDotId);
+    if (el) el.classList.remove('selected');
+  }
+  selectedDotId = null;
+}
+
+function removeDot(id) {
+  dots = dots.filter(d => d.id !== id);
+  const el = document.getElementById('dot-' + id);
+  if (el) el.remove();
+  if (selectedDotId === id) selectedDotId = null;
+  closePopup();
+  redrawRoutes();
+  markUnsaved();
+}
+
+function deleteSelectedDot() {
+  if (selectedDotId) { removeDot(selectedDotId); closePopup(); }
+}
+
+function openPopup(id, e) {
+  selectDot(id);
+  const dot = dots.find(d => d.id === id);
+  if (!dot) return;
+  const popup = document.getElementById('dot-popup');
+  popup.classList.remove('hidden');
+  document.getElementById('popup-title').textContent = dot.type + ' Options';
+  document.getElementById('popup-route').value = dot.route || '';
+  document.getElementById('popup-read').value = dot.read || '';
+  document.getElementById('popup-note').value = dot.note || '';
+  document.getElementById('popup-blitz').checked = dot.isBlitzing || false;
+  document.getElementById('popup-route-group').style.display = dot.side === 'offense' ? 'block' : 'none';
+  document.getElementById('popup-read-group').style.display = dot.side === 'offense' ? 'block' : 'none';
+  document.getElementById('popup-blitz-group').style.display = dot.side === 'defense' ? 'block' : 'none';
+  const rect = e.target.closest('.dot').getBoundingClientRect();
+  const wrap = document.getElementById('canvas-wrap').getBoundingClientRect();
+  let left = rect.left - wrap.left + 30;
+  let top = rect.top - wrap.top - 20;
+  if (left + 200 > wrap.width) left = rect.left - wrap.left - 200;
+  popup.style.left = left + 'px';
+  popup.style.top = top + 'px';
+}
+
+function closePopup() { document.getElementById('dot-popup').classList.add('hidden'); deselectDot(); }
+
+function setDotRoute(val) { const d = dots.find(x => x.id === selectedDotId); if(d){d.route=val;redrawRoutes();markUnsaved();} }
+function setDotRead(val) { const d = dots.find(x => x.id === selectedDotId); if(d){d.read=val;redrawRoutes();markUnsaved();} }
+function setDotNote(val) { const d = dots.find(x => x.id === selectedDotId); if(d){d.note=val;markUnsaved();} }
+function setDotBlitz(val) { const d = dots.find(x => x.id === selectedDotId); if(d){d.isBlitzing=val;redrawRoutes();markUnsaved();} }
+
+// DRAG
+function startDrag(e, id) {
+  e.preventDefault();
+  dragDot = id;
+  const wrap = document.getElementById('canvas-wrap');
+  const rect = wrap.getBoundingClientRect();
+  const dot = dots.find(d => d.id === id);
+  dragOffset.x = e.clientX - rect.left - dot.x * rect.width;
+  dragOffset.y = e.clientY - rect.top - dot.y * rect.height;
+  window.onmousemove = doDrag;
+  window.onmouseup = stopDrag;
+}
+
+function doDrag(e) {
+  if (!dragDot) return;
+  const wrap = document.getElementById('canvas-wrap');
+  const rect = wrap.getBoundingClientRect();
+  const xPct = Math.max(0, Math.min(1, (e.clientX - rect.left - dragOffset.x) / rect.width));
+  const yPct = Math.max(0, Math.min(1, (e.clientY - rect.top - dragOffset.y) / rect.height));
+  const dot = dots.find(d => d.id === dragDot);
+  if (dot) { dot.x = xPct; dot.y = yPct; renderDot(dot); redrawRoutes(); }
+}
+
+function stopDrag() { dragDot = null; window.onmousemove = null; window.onmouseup = null; markUnsaved(); }
+
+// ROUTES & ARROWS
+function redrawRoutes() {
+  const canvas = document.getElementById('route-canvas');
+  const wrap = document.getElementById('canvas-wrap');
+  canvas.width = wrap.offsetWidth;
+  canvas.height = wrap.offsetHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  dots.filter(d => d.route && d.side === 'offense').forEach(d => drawRoute(ctx, d, canvas));
+  dots.filter(d => d.isBlitzing).forEach(d => drawBlitzArrowCanvas(ctx, d, canvas));
+}
+
+function getReadColor(read) {
+  if (read === '1') return '#B2FF00';
+  if (read === '2') return '#004FFF';
+  if (read === '3') return '#FF8C00';
+  if (read === 'hot') return '#FF0400';
+  return '#ffffff88';
+}
+
+function drawRoute(ctx, dot, canvas) {
+  const x = dot.x * canvas.width;
+  const y = dot.y * canvas.height;
+  const color = getReadColor(dot.read);
+  const routeOffsets = {
+    'Hitch': [{dx:0,dy:-30}],
+    'Slant': [{dx:0,dy:-20},{dx:30,dy:-50}],
+    'Curl': [{dx:0,dy:-60},{dx:-15,dy:-40}],
+    'Out': [{dx:0,dy:-30},{dx:50,dy:-30}],
+    'In / Dig': [{dx:0,dy:-30},{dx:-50,dy:-30}],
+    'Post': [{dx:0,dy:-30},{dx:30,dy:-80}],
+    'Corner': [{dx:0,dy:-40},{dx:50,dy:-80}],
+    'Fade': [{dx:15,dy:-80}],
+    'Seam / Vertical': [{dx:0,dy:-100}],
+    'Flat / Arrow': [{dx:40,dy:-5}],
+    'Swing': [{dx:-30,dy:10},{dx:-50,dy:-30}],
+    'Wheel': [{dx:-30,dy:5},{dx:-30,dy:-80}],
+    'Cross / Shallow': [{dx:0,dy:-15},{dx:80,dy:-15}],
+    'Comeback': [{dx:0,dy:-70},{dx:-20,dy:-50}],
+  };
+  const pts = routeOffsets[dot.route];
+  if (!pts) return;
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  let lx = x, ly = y;
+  pts.forEach(p => { lx += p.dx; ly += p.dy; ctx.lineTo(lx, ly); });
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2.5;
+  ctx.setLineDash([6, 4]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.arc(lx, ly, 5, 0, Math.PI * 2);
+  ctx.fillStyle = color;
+  ctx.fill();
+}
+
+function drawBlitzArrowCanvas(ctx, dot, canvas) {
+  const x = dot.x * canvas.width;
+  const y = dot.y * canvas.height;
+  const qbs = dots.filter(d => d.type === 'QB');
+  const targetY = qbs.length > 0 ? qbs[0].y * canvas.height : canvas.height * 0.72;
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x, targetY + 20);
+  ctx.strokeStyle = '#FF0400';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([8, 4]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(x, targetY + 10);
+  ctx.lineTo(x - 8, targetY + 25);
+  ctx.lineTo(x + 8, targetY + 25);
+  ctx.closePath();
+  ctx.fillStyle = '#FF0400';
+  ctx.fill();
+}
+
+function drawBlitzArrow(dot) { redrawRoutes(); }
+
+// FRONT PRESETS
+const FRONT_PRESETS = {
+  '4-3': [{x:0.33,y:0.68,isLineman:true},{x:0.4,y:0.68,isLineman:true},{x:0.47,y:0.68,isLineman:true},{x:0.54,y:0.68,isLineman:true}],
+  '3-4': [{x:0.37,y:0.68,isLineman:true},{x:0.44,y:0.68,isLineman:true},{x:0.51,y:0.68,isLineman:true}],
+  'Nickel': [{x:0.33,y:0.68,isLineman:true},{x:0.4,y:0.68,isLineman:true},{x:0.47,y:0.68,isLineman:true},{x:0.54,y:0.68,isLineman:true}],
+  'Dime': [{x:0.35,y:0.68,isLineman:true},{x:0.42,y:0.68,isLineman:true},{x:0.49,y:0.68,isLineman:true},{x:0.56,y:0.68,isLineman:true}],
+  'Bear': [{x:0.31,y:0.68,isLineman:true},{x:0.38,y:0.68,isLineman:true},{x:0.44,y:0.68,isLineman:true},{x:0.51,y:0.68,isLineman:true},{x:0.57,y:0.68,isLineman:true}],
+  '4-2-5': [{x:0.33,y:0.68,isLineman:true},{x:0.4,y:0.68,isLineman:true},{x:0.47,y:0.68,isLineman:true},{x:0.54,y:0.68,isLineman:true}],
+  'Eagle': [{x:0.35,y:0.68,isLineman:true},{x:0.42,y:0.68,isLineman:true},{x:0.49,y:0.68,isLineman:true},{x:0.56,y:0.68,isLineman:true}],
+  'Okie': [{x:0.37,y:0.68,isLineman:true},{x:0.44,y:0.68,isLineman:true},{x:0.51,y:0.68,isLineman:true}],
+  'Stack': [{x:0.37,y:0.68,isLineman:true},{x:0.44,y:0.68,isLineman:true},{x:0.51,y:0.68,isLineman:true}],
+};
+
+const PERSONNEL_PRESETS = {
+  '11 (3 WR, 1 TE, 1 RB)': [{x:0.33,y:0.72,isLineman:true},{x:0.39,y:0.72,isLineman:true},{x:0.44,y:0.72,isLineman:true},{x:0.5,y:0.72,isLineman:true},{x:0.56,y:0.72,isLineman:true}],
+  '12 (2 WR, 2 TE, 1 RB)': [{x:0.34,y:0.72,isLineman:true},{x:0.4,y:0.72,isLineman:true},{x:0.45,y:0.72,isLineman:true},{x:0.5,y:0.72,isLineman:true},{x:0.56,y:0.72,isLineman:true}],
+  '10 / Empty (4-5 WR)': [{x:0.35,y:0.72,isLineman:true},{x:0.41,y:0.72,isLineman:true},{x:0.46,y:0.72,isLineman:true},{x:0.51,y:0.72,isLineman:true},{x:0.57,y:0.72,isLineman:true}],
+  '21 (2 WR, 1 TE, 2 RB)': [{x:0.34,y:0.72,isLineman:true},{x:0.4,y:0.72,isLineman:true},{x:0.45,y:0.72,isLineman:true},{x:0.5,y:0.72,isLineman:true},{x:0.56,y:0.72,isLineman:true}],
+  '20 (3 WR, 0 TE, 2 RB)': [{x:0.35,y:0.72,isLineman:true},{x:0.41,y:0.72,isLineman:true},{x:0.46,y:0.72,isLineman:true},{x:0.51,y:0.72,isLineman:true},{x:0.57,y:0.72,isLineman:true}],
+};
+
+function applyFront(front) {
+  dots = dots.filter(d => !d.isLineman || d.side === 'offense');
+  document.querySelectorAll('.dot.dot-lineman').forEach(el => {
+    const dotData = dots.find(d => 'dot-' + d.id === el.id);
+    if (!dotData) el.remove();
+  });
+  const preset = FRONT_PRESETS[front];
+  if (!preset) return;
+  preset.forEach(p => placeDot(p.x, p.y, 'DL', '#888888', 'defense', true));
+  markUnsaved();
+}
+
+function applyPersonnel(personnel) {
+  dots = dots.filter(d => !d.isLineman || d.side === 'defense');
+  document.querySelectorAll('.dot.dot-lineman').forEach(el => {
+    const dotData = dots.find(d => 'dot-' + d.id === el.id);
+    if (!dotData) el.remove();
+  });
+  const preset = PERSONNEL_PRESETS[personnel];
+  if (!preset) return;
+  preset.forEach(p => placeDot(p.x, p.y, 'OL', '#555555', 'offense', true));
+  markUnsaved();
+}
+
+function toggleBlitz() {
+  const on = document.getElementById('tog-blitz').checked;
+  document.getElementById('blitz-type-wrap').classList.toggle('hidden', !on);
+}
+
+function clearCanvas() {
+  if (!confirm('Clear all dots from the canvas?')) return;
+  dots = [];
+  document.querySelectorAll('.dot').forEach(el => el.remove());
+  redrawRoutes();
+  markUnsaved();
+}
+
+function markUnsaved() {
+  document.getElementById('save-indicator').textContent = 'Unsaved changes';
+  document.getElementById('save-indicator').style.color = 'var(--red)';
+}
+
+async function saveFormation() {
+  const name = document.getElementById('f-name').value.trim();
+  if (!name) { alert('Please give this formation a name.'); return; }
+  const coverage = document.getElementById('f-coverage').value;
+  if (!coverage) { alert('Please select a coverage type.'); return; }
+  const data = {
+    name,
+    coverage,
+    front: document.getElementById('f-front').value,
+    personnel: document.getElementById('f-personnel').value,
+    difficulty: document.getElementById('f-difficulty').value,
+    has_blitz: document.getElementById('tog-blitz').checked,
+    blitz_type: document.getElementById('f-blitz-type').value,
+    has_routes: document.getElementById('tog-routes').checked,
+    is_disguised: document.getElementById('tog-disguise').checked,
+    film_notes: document.getElementById('f-film-notes').value,
+    dots: JSON.stringify(dots),
+    updated_at: new Date().toISOString()
+  };
+
+  const user = await getUser();
+  if (!user) { alert('Not logged in.'); return; }
+  data.created_by = user.id;
+
+  let result;
+  if (formationId) {
+    result = await db.from('formations').update(data).eq('id', formationId).select().single();
+  } else {
+    result = await db.from('formations').insert(data).select().single();
+    if (result.data) formationId = result.data.id;
+  }
+
+  if (result.error) { alert('Save failed: ' + result.error.message); return; }
+  document.getElementById('save-indicator').textContent = 'Saved ✓';
+  document.getElementById('save-indicator').style.color = 'var(--green)';
+  document.getElementById('save-status').textContent = 'Last saved: ' + new Date().toLocaleTimeString();
+}
+
+async function loadFormation(id) {
+  const { data, error } = await db.from('formations').select('*').eq('id', id).single();
+  if (error || !data) return;
+  formationId = id;
+  document.getElementById('f-name').value = data.name || '';
+  document.getElementById('f-coverage').value = data.coverage || '';
+  document.getElementById('f-front').value = data.front || '';
+  document.getElementById('f-personnel').value = data.personnel || '';
+  document.getElementById('f-difficulty').value = data.difficulty || 'beginner';
+  document.getElementById('tog-blitz').checked = data.has_blitz || false;
+  document.getElementById('tog-routes').checked = data.has_routes || false;
+  document.getElementById('tog-disguise').checked = data.is_disguised || false;
+  document.getElementById('f-film-notes').value = data.film_notes || '';
+  if (data.has_blitz) { document.getElementById('blitz-type-wrap').classList.remove('hidden'); document.getElementById('f-blitz-type').value = data.blitz_type || ''; }
+  if (data.dots) {
+    const savedDots = JSON.parse(data.dots);
+    savedDots.forEach(d => placeDot(d.x, d.y, d.type, d.color, d.side, d.isLineman, d.id, d));
+  }
+  document.getElementById('save-indicator').textContent = 'Loaded';
+  document.getElementById('save-indicator').style.color = 'var(--green)';
+}
+
+async function init() {
+  await requireAdmin();
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get('id');
+  if (id) loadFormation(id);
+  window.addEventListener('resize', () => { redrawRoutes(); });
+  document.getElementById('field-img').onload = () => { redrawRoutes(); };
+}
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.dot-popup') && !e.target.closest('.dot')) closePopup();
+});
+
+init();
+</script>
+</body>
+</html>

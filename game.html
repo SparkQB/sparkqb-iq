@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Game — Signal Caller</title>
+<link rel="stylesheet" href="css/sparkqb.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+.game-wrap { max-width: 720px; margin: 0 auto; padding: 20px; }
+.mode-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.play-counter { font-family: 'Anton', sans-serif; font-size: 28px; }
+.play-counter span { color: var(--green); }
+
+/* Clock ring */
+.clock-wrap { position: relative; width: 64px; height: 64px; flex-shrink: 0; }
+.clock-wrap svg { transform: rotate(-90deg); }
+.clock-num { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: 'Anton', sans-serif; font-size: 20px; }
+
+/* Situation bar */
+.sit-bar { background: var(--gray2); border-radius: var(--radius-md); padding: 10px 16px; display: flex; gap: 20px; margin-bottom: 14px; flex-wrap: wrap; }
+.sit-item { font-family: 'Roboto Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+.sit-item span { color: var(--white); }
+
+/* Streak */
+.streak-row { display: flex; gap: 5px; margin-bottom: 14px; }
+.streak-pip { height: 6px; flex: 1; border-radius: 3px; background: rgba(255,255,255,0.1); transition: background 0.3s; }
+.streak-pip.hit { background: var(--green); }
+.streak-pip.miss { background: var(--red); }
+
+/* Field canvas */
+.field-wrap { position: relative; width: 100%; border-radius: var(--radius-lg); overflow: hidden; margin-bottom: 14px; border: 1px solid var(--border); }
+.field-img { width: 100%; height: auto; display: block; }
+.field-overlay { position: absolute; inset: 0; }
+.field-dot { position: absolute; border-radius: 50%; transform: translate(-50%, -50%); cursor: pointer; transition: box-shadow 0.15s, transform 0.15s; }
+.field-dot.tappable:hover { transform: translate(-50%, -50%) scale(1.2); box-shadow: 0 0 0 4px rgba(178,255,0,0.4); }
+.field-dot.tappable.correct-tap { box-shadow: 0 0 0 5px var(--green); transform: translate(-50%,-50%) scale(1.2); }
+.field-dot.tappable.wrong-tap { box-shadow: 0 0 0 5px var(--red); }
+.field-dot-label { position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin-top: 3px; font-family: 'Roboto Mono', monospace; font-size: 9px; white-space: nowrap; text-shadow: 0 1px 4px rgba(0,0,0,0.9); pointer-events: none; }
+#route-canvas-game { position: absolute; inset: 0; pointer-events: none; }
+
+/* Phase label */
+.phase-label { font-family: 'Roboto Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--green); margin-bottom: 8px; }
+
+/* Choice buttons */
+.choices-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+.choice-btn { background: var(--gray1); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px 12px; cursor: pointer; font-family: 'Roboto Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--white); transition: all 0.15s; text-align: center; }
+.choice-btn:hover:not(:disabled) { border-color: var(--blue); background: var(--gray2); }
+.choice-btn:disabled { cursor: default; }
+.choice-btn.correct { border-color: var(--green); background: rgba(178,255,0,0.08); color: var(--green); }
+.choice-btn.wrong { border-color: var(--red); background: rgba(255,4,0,0.08); color: #ff6666; }
+
+/* Play clock bar (drive mode) */
+.pc-wrap { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.pc-label { font-family: 'Roboto Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); width: 70px; flex-shrink: 0; }
+.pc-bar-wrap { flex: 1; background: rgba(255,255,255,0.1); border-radius: 3px; height: 4px; overflow: hidden; }
+.pc-bar-fill { height: 100%; background: var(--green); border-radius: 3px; transition: width 0.1s linear; }
+.pc-bar-fill.warn { background: var(--red); }
+.pc-num { font-family: 'Anton', sans-serif; font-size: 18px; color: var(--green); width: 28px; text-align: right; }
+.pc-num.warn { color: var(--red); }
+
+/* Film review */
+.film-card { background: var(--gray2); border-left: 3px solid var(--blue); border-radius: 0 var(--radius-md) var(--radius-md) 0; padding: 14px; margin-bottom: 12px; }
+.film-label { font-family: 'Roboto Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: #6699ff; margin-bottom: 6px; }
+.film-text { font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
+
+/* Outcome (drive) */
+.outcome-card { background: var(--gray2); border-radius: var(--radius-lg); padding: 20px; text-align: center; margin-bottom: 12px; }
+.outcome-yards { font-family: 'Anton', sans-serif; font-size: 48px; line-height: 1; margin-bottom: 6px; }
+.outcome-yards.pos { color: var(--green); }
+.outcome-yards.neg { color: var(--red); }
+.outcome-desc { font-size: 14px; color: var(--text-secondary); line-height: 1.5; }
+
+/* Scoreboard (drive) */
+.scoreboard { background: var(--gray1); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 14px 20px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; margin-bottom: 14px; }
+.score-team { text-align: center; }
+.score-name { font-family: 'Roboto Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 4px; }
+.score-num { font-family: 'Anton', sans-serif; font-size: 36px; line-height: 1; }
+.score-mid { text-align: center; }
+.score-qtr { font-family: 'Roboto Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+.score-clock { font-family: 'Anton', sans-serif; font-size: 20px; color: var(--green); }
+.down-bar { background: var(--blue); border-radius: var(--radius-md); padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.down-text { font-family: 'Anton', sans-serif; font-size: 22px; }
+.down-sub { font-family: 'Roboto Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: rgba(255,255,255,0.75); }
+
+/* Result screen */
+.result-screen { text-align: center; padding: 40px 20px; }
+.result-icon { font-size: 64px; margin-bottom: 16px; }
+.result-title { font-family: 'Anton', sans-serif; font-size: 52px; text-transform: uppercase; margin-bottom: 8px; }
+.result-title.win { color: var(--green); }
+.result-title.loss { color: var(--red); }
+.result-stat { font-family: 'Roboto Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 24px; }
+.result-rating { font-family: 'Anton', sans-serif; font-size: 24px; color: var(--green); margin-bottom: 32px; }
+.result-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+
+/* Reveal toggle */
+.reveal-btn { display: flex; align-items: center; gap: 8px; background: rgba(0,79,255,0.1); border: 1px solid rgba(0,79,255,0.25); border-radius: var(--radius-md); padding: 8px 14px; cursor: pointer; font-family: 'Roboto Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: #6699ff; margin-bottom: 12px; transition: all 0.2s; }
+.reveal-btn:hover { background: rgba(0,79,255,0.18); }
+</style>
+</head>
+<body>
+<nav class="nav">
+  <a href="locker-room.html" class="nav-logo">
+    <div class="nav-logomark"></div>
+    <div class="nav-wordmark">Spark<span>QB</span></div>
+  </a>
+  <div class="nav-badge" id="mode-badge">Quick Reps</div>
+  <div class="nav-spacer"></div>
+  <a href="locker-room.html" class="btn btn-sm">← Locker Room</a>
+</nav>
+
+<div class="game-wrap">
+  <div id="loading" class="loading"><div class="spinner"></div>Loading formations...</div>
+  <div id="game-content" class="hidden"></div>
+  <div id="result-content" class="hidden"></div>
+</div>
+
+<script src="js/supabase.js"></script>
+<script>
+const params = new URLSearchParams(window.location.search);
+const MODE = params.get('mode') || 'quickreps';
+const SITUATIONS = [
+  {down:'1st & 10',hash:'Middle',zone:'Open Field'},
+  {down:'2nd & 7',hash:'Right Hash',zone:'Open Field'},
+  {down:'3rd & Long',hash:'Left Hash',zone:'Open Field'},
+  {down:'3rd & Short',hash:'Middle',zone:'Red Zone'},
+  {down:'Red Zone',hash:'Middle',zone:'Red Zone'},
+  {down:'2-Min Drill',hash:'Middle',zone:'Two Minute'},
+];
+const CONCEPTS_BY_COVERAGE = {
+  'Cover 2': ['Four Verticals','Smash','Double Slants','Flood'],
+  'Cover 3': ['Four Verticals','Flood','Slant/Arrow','Mesh'],
+  'Cover 4': ['Hitches','Slant/Arrow','Post/Dig','Flood'],
+  'Man Free (Cover 1)': ['Crossers','Pick Routes','Quick Game','Motions'],
+  'Cover 0': ['Hot Routes','Back Out of Backfield','Smoke Routes','Fade/Back Shoulder'],
+  '2-Man': ['Run the Ball','QB Draw','Crossers/Pick Routes','Quick Game'],
+  'Cover 6': ['Four Verticals','Flood','Slant/Arrow','Spacing'],
+  'Tampa 2': ['Seam Routes','Mesh','Post/Dig','Four Verticals'],
+  'Cover 3 Cloud': ['Flood','Four Verticals','Slant/Arrow','Mesh'],
+  'PALMS': ['Four Verticals','Flood','Post/Dig','Smash'],
+};
+const ALL_COVERAGES = Object.keys(CONCEPTS_BY_COVERAGE);
+
+let state = {
+  user: null, profile: null,
+  formations: [],
+  currentIdx: 0, correct: 0, total: 0,
+  streak: [],
+  driveDown: 1, driveToGo: 10, driveYardline: 35,
+  driveScore: 0, drivePlays: 0,
+  clockInterval: null, pcInterval: null,
+  answered: false, drivePhase: 'coverage',
+  currentFormation: null, revealShown: false,
+  tap1Correct: false, tap2Correct: false,
+  reactionStart: null, reactionTime: null,
+};
+
+document.getElementById('mode-badge').textContent = MODE === 'drive' ? 'Drive Mode' : 'Quick Reps';
+
+function shuffle(a) { return [...a].sort(() => Math.random() - 0.5); }
+function uid() { return Math.random().toString(36).substr(2,9); }
+
+async function init() {
+  state.user = await requireAuth();
+  if (!state.user) return;
+  state.profile = await getProfile(state.user.id);
+  const { data: formations } = await db.from('formations').select('*').order('created_at', { ascending: false });
+  state.formations = formations || [];
+  document.getElementById('loading').classList.add('hidden');
+  document.getElementById('game-content').classList.remove('hidden');
+  MODE === 'drive' ? startDriveMode() : startQuickReps();
+}
+
+// ─── QUICK REPS ───────────────────────────────────────────────
+let qrPlays = [];
+let qrIdx = 0;
+
+function startQuickReps() {
+  state.correct = 0; state.total = 0; qrIdx = 0; state.streak = [];
+  qrPlays = shuffle(state.formations.length >= 10 ? state.formations : [...state.formations, ...state.formations, ...state.formations]).slice(0, 10);
+  if (qrPlays.length === 0) { renderNoFormations(); return; }
+  renderQRPlay();
+}
+
+function renderQRPlay() {
+  clearIntervals();
+  state.answered = false; state.revealShown = false;
+  const f = qrPlays[qrIdx];
+  state.currentFormation = f;
+  const sit = SITUATIONS[Math.floor(Math.random() * SITUATIONS.length)];
+  const allCovs = ALL_COVERAGES;
+  const wrongCovs = allCovs.filter(c => c !== f.coverage);
+  const opts = shuffle([f.coverage, ...shuffle(wrongCovs).slice(0, 3)]);
+  const overall = state.profile?.overall || 60;
+  const maxTime = overall < 68 ? 7 : overall < 75 ? 5 : overall < 85 ? 3 : 2;
+
+  document.getElementById('game-content').innerHTML = `
+    <div class="mode-header">
+      <div>
+        <div class="eyebrow mb-4">Quick Reps</div>
+        <div class="play-counter">Play <span>${qrIdx + 1}</span>/10</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="mono" style="font-size:12px"><span style="color:var(--green)">${state.correct}</span>/${state.total}</div>
+        <div class="clock-wrap">
+          <svg viewBox="0 0 64 64" width="64" height="64">
+            <circle cx="32" cy="32" r="27" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="4"/>
+            <circle id="clock-ring" cx="32" cy="32" r="27" fill="none" stroke="var(--green)" stroke-width="4" stroke-linecap="round" stroke-dasharray="169.6" stroke-dashoffset="0"/>
+          </svg>
+          <div class="clock-num" id="clock-num">${maxTime}</div>
+        </div>
+      </div>
+    </div>
+    <div class="streak-row" id="streak-row">${Array(10).fill(0).map((_,i) => `<div class="streak-pip ${state.streak[i] === 'hit' ? 'hit' : state.streak[i] === 'miss' ? 'miss' : ''}" id="pip-${i}"></div>`).join('')}</div>
+    <div class="sit-bar">
+      <div class="sit-item">Down: <span>${sit.down}</span></div>
+      <div class="sit-item">Hash: <span>${sit.hash}</span></div>
+      <div class="sit-item">Zone: <span>${sit.zone}</span></div>
+    </div>
+    <div class="field-wrap" id="field-wrap">
+      <img src="assets/field.png" class="field-img" id="field-img" alt="Field">
+      <canvas id="route-canvas-game"></canvas>
+      <div class="field-overlay" id="field-overlay"></div>
+    </div>
+    <div id="film-card-wrap"></div>
+    <div id="reveal-wrap"></div>
+    <div class="phase-label">ID the Coverage</div>
+    <div class="choices-grid" id="choices-grid">
+      ${opts.map(o => `<button class="choice-btn" onclick="answerQR('${o}','${f.coverage}',this)">${o}</button>`).join('')}
+    </div>
+    <button class="btn btn-primary btn-full hidden" id="next-btn" onclick="nextQRPlay()">Next Play →</button>
+  `;
+
+  renderFormationDots(f, false);
+  startClock(maxTime);
+}
+
+function startClock(maxTime) {
+  let t = maxTime;
+  updateClock(t, maxTime);
+  state.clockInterval = setInterval(() => {
+    t -= 0.1;
+    updateClock(t, maxTime);
+    if (t <= 0) { clearInterval(state.clockInterval); timeoutQR(); }
+  }, 100);
+}
+
+function updateClock(t, max) {
+  const n = Math.max(0, Math.ceil(t));
+  const el = document.getElementById('clock-num');
+  const ring = document.getElementById('clock-ring');
+  if (!el || !ring) return;
+  el.textContent = n;
+  const pct = Math.max(0, t / max);
+  ring.style.strokeDashoffset = 169.6 * (1 - pct);
+  const color = t < max * 0.35 ? 'var(--red)' : t < max * 0.6 ? '#FF8C00' : 'var(--green)';
+  ring.style.stroke = color;
+  el.style.color = color;
+}
+
+function timeoutQR() {
+  const f = qrPlays[qrIdx];
+  answerQR('__timeout__', f.coverage, null);
+}
+
+function answerQR(chosen, correct, btn) {
+  if (state.answered) return;
+  state.answered = true;
+  clearInterval(state.clockInterval);
+  const isCorrect = chosen === correct;
+  state.total++;
+  if (isCorrect) state.correct++;
+  state.streak.push(isCorrect ? 'hit' : 'miss');
+  const pip = document.getElementById('pip-' + qrIdx);
+  if (pip) pip.className = 'streak-pip ' + (isCorrect ? 'hit' : 'miss');
+  document.querySelectorAll('.choice-btn').forEach(b => {
+    b.disabled = true;
+    if (b.textContent === correct) b.classList.add('correct');
+    else if (b === btn && !isCorrect) b.classList.add('wrong');
+  });
+  const filmWrap = document.getElementById('film-card-wrap');
+  if (filmWrap) filmWrap.innerHTML = `
+    <div class="film-card">
+      <div class="film-label">📽 Film Review</div>
+      <div class="film-text"><strong>${correct}</strong> — ${isCorrect ? '✓ Correct! ' : '✗ Missed. '}${state.currentFormation?.film_notes || 'Study the pre-snap keys for this coverage.'}</div>
+    </div>`;
+
+  const revealWrap = document.getElementById('reveal-wrap');
+  if (revealWrap && state.currentFormation?.dots) {
+    revealWrap.innerHTML = `<button class="reveal-btn" onclick="toggleReveal()">Show Coverage Zones →</button>`;
+  }
+
+  const nextBtn = document.getElementById('next-btn');
+  if (nextBtn) nextBtn.classList.remove('hidden');
+
+  logAttempt({ coverage_id: correct, tap1_correct: isCorrect, correct: isCorrect, mode: 'quickreps', formation_id: state.currentFormation?.id });
+  if (isCorrect) updateProfile({ attr_coverage_iq: Math.min(99, (state.profile?.attr_coverage_iq || 60) + 1), attr_processing_speed: Math.min(99, (state.profile?.attr_processing_speed || 60) + 1) });
+}
+
+function toggleReveal() {
+  state.revealShown = !state.revealShown;
+  const btn = document.querySelector('.reveal-btn');
+  if (btn) btn.textContent = state.revealShown ? 'Hide Coverage →' : 'Show Coverage Zones →';
+  renderFormationDots(state.currentFormation, state.revealShown);
+}
+
+function nextQRPlay() {
+  qrIdx++;
+  if (qrIdx >= 10) { finishQuickReps(); return; }
+  renderQRPlay();
+}
+
+function finishQuickReps() {
+  clearIntervals();
+  const pct = Math.round(state.correct / 10 * 100);
+  const gained = pct >= 80 ? 2 : pct >= 60 ? 1 : 0;
+  const newOverall = Math.min(99, (state.profile?.overall || 60) + gained);
+  if (gained > 0) updateProfile({ overall: newOverall, xp: (state.profile?.xp || 0) + (state.correct * 50) });
+  showResult(pct >= 80 ? '🏆' : pct >= 60 ? '📈' : '📋', pct >= 80 ? 'Elite Rep!' : pct >= 60 ? 'Good Reps' : 'Keep Grinding', pct >= 60, `${state.correct}/10 correct · ${pct}% accuracy`, gained > 0 ? `+${gained} Overall → ${newOverall}` : 'No rating change — hit 60%+ to improve', 'quickreps');
+}
+
+// ─── DRIVE MODE ───────────────────────────────────────────────
+let drivePlays = [];
+let driveIdx = 0;
+
+function startDriveMode() {
+  state.driveDown = 1; state.driveToGo = 10; state.driveYardline = 35;
+  state.driveScore = 0; state.drivePlays = 0; driveIdx = 0;
+  drivePlays = shuffle(state.formations).slice(0, 8);
+  if (drivePlays.length === 0) { renderNoFormations(); return; }
+  renderDrivePlay();
+}
+
+function renderDrivePlay() {
+  clearIntervals();
+  state.answered = false; state.drivePhase = 'coverage';
+  state.tap1Correct = false; state.tap2Correct = false;
+  state.revealShown = false;
+  const f = drivePlays[driveIdx % drivePlays.length];
+  state.currentFormation = f;
+  const allCovs = ALL_COVERAGES;
+  const wrongCovs = allCovs.filter(c => c !== f.coverage);
+  const opts = shuffle([f.coverage, ...shuffle(wrongCovs).slice(0, 3)]);
+  const yardlineLabel = state.driveYardline >= 50 ? `Opp ${100 - state.driveYardline}` : `Own ${state.driveYardline}`;
+
+  document.getElementById('game-content').innerHTML = `
+    <div class="scoreboard">
+      <div class="score-team"><div class="score-name">Signal Caller</div><div class="score-num text-green" id="dm-us">${state.driveScore}</div></div>
+      <div class="score-mid"><div class="score-qtr">3rd Qtr</div><div class="score-clock">8:42</div></div>
+      <div class="score-team"><div class="score-name">Defense</div><div class="score-num">7</div></div>
+    </div>
+    <div class="down-bar">
+      <div><div class="down-text" id="dm-down">${formatDown(state.driveDown, state.driveToGo)}</div><div class="down-sub" id="dm-hash">Middle Hash · ${state.driveYardline < 20 ? 'Red Zone' : 'Open Field'}</div></div>
+      <div class="down-sub" id="dm-yl">${yardlineLabel}</div>
+    </div>
+    <div class="pc-wrap">
+      <div class="pc-label">Play Clock</div>
+      <div class="pc-bar-wrap"><div class="pc-bar-fill" id="pc-fill" style="width:100%"></div></div>
+      <div class="pc-num" id="pc-num">25</div>
+    </div>
+    <div class="field-wrap" id="field-wrap">
+      <img src="assets/field.png" class="field-img" id="field-img" alt="Field">
+      <canvas id="route-canvas-game"></canvas>
+      <div class="field-overlay" id="field-overlay"></div>
+    </div>
+    <div id="outcome-wrap"></div>
+    <div id="film-card-wrap"></div>
+    <div id="reveal-wrap"></div>
+    <div id="phase-content">
+      <div class="phase-label">Pre-Snap · ID the Coverage</div>
+      <div class="choices-grid" id="choices-grid">
+        ${opts.map(o => `<button class="choice-btn" onclick="answerDMCoverage('${o}','${f.coverage}',this)">${o}</button>`).join('')}
+      </div>
+    </div>
+    <button class="btn btn-primary btn-full hidden" id="dm-next-btn" onclick="nextDrivePlay()">Next Play →</button>
+  `;
+
+  renderFormationDots(f, false);
+  startPlayClock();
+}
+
+function startPlayClock() {
+  let pc = 25;
+  updatePC(pc);
+  state.pcInterval = setInterval(() => {
+    pc--;
+    updatePC(pc);
+    if (pc <= 0) { clearInterval(state.pcInterval); answerDMCoverage('__timeout__', state.currentFormation?.coverage || '', null); }
+  }, 1000);
+}
+
+function updatePC(pc) {
+  const fill = document.getElementById('pc-fill');
+  const num = document.getElementById('pc-num');
+  if (!fill || !num) return;
+  fill.style.width = (pc / 25 * 100) + '%';
+  num.textContent = pc;
+  fill.className = 'pc-bar-fill' + (pc <= 8 ? ' warn' : '');
+  num.className = 'pc-num' + (pc <= 8 ? ' warn' : '');
+}
+
+function answerDMCoverage(chosen, correct, btn) {
+  if (state.drivePhase !== 'coverage') return;
+  clearInterval(state.pcInterval);
+  state.drivePhase = 'concept';
+  state.tap1Correct = chosen === correct;
+  document.querySelectorAll('#choices-grid .choice-btn').forEach(b => {
+    b.disabled = true;
+    if (b.textContent === correct) b.classList.add('correct');
+    else if (b === btn && !state.tap1Correct) b.classList.add('wrong');
+  });
+  setTimeout(() => renderConceptPhase(), 500);
+}
+
+function renderConceptPhase() {
+  const f = state.currentFormation;
+  const goodConcepts = CONCEPTS_BY_COVERAGE[f.coverage] || ['Four Verticals', 'Mesh', 'Flood', 'Smash'];
+  const correct = goodConcepts[0];
+  const allConcepts = ['Four Verticals','Mesh','Smash','Flood','Slant/Arrow','Post/Dig','Spacing','Hitch/Seam','Crossers','Pick Routes'];
+  const wrong = allConcepts.filter(c => !goodConcepts.includes(c));
+  const opts = shuffle([correct, ...shuffle(wrong).slice(0, 3)]);
+  const phase = document.getElementById('phase-content');
+  if (phase) phase.innerHTML = `
+    <div class="phase-label">Post-Snap · Select Your Concept</div>
+    <div class="choices-grid">
+      ${opts.map(o => `<button class="choice-btn" onclick="answerDMConcept('${o}','${correct}',this,${JSON.stringify(goodConcepts)})">${o}</button>`).join('')}
+    </div>`;
+}
+
+function answerDMConcept(chosen, correct, btn, goodConcepts) {
+  if (state.drivePhase !== 'concept') return;
+  state.drivePhase = 'read';
+  state.tap2Correct = goodConcepts.includes(chosen);
+  document.querySelectorAll('#phase-content .choice-btn').forEach(b => {
+    b.disabled = true;
+    if (goodConcepts.includes(b.textContent)) b.classList.add('correct');
+    else if (b === btn && !state.tap2Correct) b.classList.add('wrong');
+  });
+  const hasRoutes = state.currentFormation?.has_routes;
+  if (hasRoutes) {
+    setTimeout(() => renderReadPhase(), 500);
+  } else {
+    setTimeout(() => resolvePlay(), 500);
+  }
+}
+
+function renderReadPhase() {
+  state.drivePhase = 'read';
+  state.reactionStart = Date.now();
+  renderFormationDots(state.currentFormation, true);
+  const phase = document.getElementById('phase-content');
+  if (phase) phase.innerHTML = `<div class="phase-label">Routes Revealed · Tap Your First Read</div><div class="mono" style="font-size:10px;color:var(--text-muted);margin-bottom:8px">Tap the receiver on the field</div>`;
+  makeDotsTappable();
+}
+
+function makeDotsTappable() {
+  const dots = JSON.parse(state.currentFormation?.dots || '[]');
+  dots.filter(d => d.side === 'offense' && !d.isLineman && d.type !== 'QB').forEach(d => {
+    const el = document.getElementById('gdot-' + d.id);
+    if (el) {
+      el.classList.add('tappable');
+      el.style.cursor = 'pointer';
+      el.onclick = () => answerRead(d);
+    }
+  });
+}
+
+function answerRead(dot) {
+  if (state.drivePhase !== 'read') return;
+  state.drivePhase = 'done';
+  state.reactionTime = Date.now() - state.reactionStart;
+  const isCorrect = dot.read === '1';
+  state.tap3Correct = isCorrect;
+  document.querySelectorAll('.field-dot.tappable').forEach(el => { el.classList.remove('tappable'); el.style.cursor = 'default'; });
+  const dotEl = document.getElementById('gdot-' + dot.id);
+  if (dotEl) dotEl.classList.add(isCorrect ? 'correct-tap' : 'wrong-tap');
+  setTimeout(() => resolvePlay(), 400);
+}
+
+function resolvePlay() {
+  const bothCorrect = state.tap1Correct && state.tap2Correct;
+  const f = state.currentFormation;
+  const ydsGained = bothCorrect ? (7 + Math.floor(Math.random() * 8)) : (Math.random() > 0.5 ? -3 : 1);
+  const outcomeWrap = document.getElementById('outcome-wrap');
+  if (outcomeWrap) outcomeWrap.innerHTML = `
+    <div class="outcome-card">
+      <div class="outcome-yards ${ydsGained > 0 ? 'pos' : 'neg'}">${ydsGained > 0 ? '+' : ''}${ydsGained}</div>
+      <div class="outcome-desc">${bothCorrect ? 'Good read! The coverage was open to that concept.' : 'Wrong coverage or concept — the defense had you covered.'}</div>
+    </div>`;
+  const filmWrap = document.getElementById('film-card-wrap');
+  if (filmWrap) filmWrap.innerHTML = `
+    <div class="film-card">
+      <div class="film-label">📽 Film Review</div>
+      <div class="film-text">${f?.film_notes || 'Study the pre-snap keys for this coverage.'}</div>
+    </div>`;
+
+  if (bothCorrect) {
+    state.driveYardline = Math.min(99, state.driveYardline + ydsGained);
+    state.driveToGo = Math.max(1, state.driveToGo - ydsGained);
+    if (state.driveToGo <= 0 || ydsGained >= state.driveToGo) { state.driveDown = 1; state.driveToGo = 10; }
+    else state.driveDown = Math.min(4, state.driveDown + 1);
+    state.driveScore += ydsGained;
+  } else {
+    state.driveDown++;
+    if (state.driveDown > 4) { setTimeout(() => finishDrive(false), 1200); return; }
+  }
+
+  if (state.driveYardline >= 100) { setTimeout(() => finishDrive(true), 1200); return; }
+
+  const nextBtn = document.getElementById('dm-next-btn');
+  if (nextBtn) nextBtn.classList.remove('hidden');
+
+  logAttempt({ coverage_id: f?.coverage, tap1_correct: state.tap1Correct, tap2_correct: state.tap2Correct, correct: bothCorrect, mode: 'drive', formation_id: f?.id, reaction_time_ms: state.reactionTime });
+  if (bothCorrect) updateProfile({ attr_decision_making: Math.min(99, (state.profile?.attr_decision_making || 60) + 1), xp: (state.profile?.xp || 0) + 80 });
+}
+
+function nextDrivePlay() {
+  driveIdx++;
+  state.drivePlays++;
+  renderDrivePlay();
+}
+
+function finishDrive(td) {
+  clearIntervals();
+  const gained = td ? 3 : 1;
+  const newOverall = Math.min(99, (state.profile?.overall || 60) + gained);
+  updateProfile({ overall: newOverall });
+  showResult(td ? '🏆' : '🏈', td ? 'Touchdown!' : 'Turnover on Downs', td, td ? `Drive complete · ${state.drivePlays} plays` : `Drive stalled after ${state.drivePlays} plays`, `+${gained} Overall → ${newOverall}`, 'drive');
+}
+
+// ─── FORMATION RENDERING ───────────────────────────────────────
+function renderFormationDots(formation, showReveal) {
+  const overlay = document.getElementById('field-overlay');
+  if (!overlay) return;
+  overlay.innerHTML = '';
+  const routeCanvas = document.getElementById('route-canvas-game');
+  const fieldWrap = document.getElementById('field-wrap');
+  if (!routeCanvas || !fieldWrap) return;
+  routeCanvas.width = fieldWrap.offsetWidth;
+  routeCanvas.height = fieldWrap.offsetHeight;
+  const ctx = routeCanvas.getContext('2d');
+  ctx.clearRect(0, 0, routeCanvas.width, routeCanvas.height);
+
+  if (!formation?.dots) return;
+  const dots = JSON.parse(formation.dots);
+
+  dots.forEach(d => {
+    const el = document.createElement('div');
+    el.id = 'gdot-' + d.id;
+    el.className = 'field-dot';
+    const size = d.isLineman ? 14 : 20;
+    el.style.cssText = `left:${d.x*100}%;top:${d.y*100}%;width:${size}px;height:${size}px;background:${d.color};border:2px solid rgba(255,255,255,${d.isLineman ? '0.15' : '0.3'});opacity:${d.isLineman ? '0.35' : '1'}`;
+    if (!d.isLineman) {
+      const label = document.createElement('div');
+      label.className = 'field-dot-label';
+      label.style.color = d.color;
+      label.textContent = d.type;
+      el.appendChild(label);
+    }
+    overlay.appendChild(el);
+  });
+
+  if (showReveal && formation.has_routes) {
+    const READ_COLORS = { '1': '#B2FF00', '2': '#004FFF', '3': '#FF8C00', 'hot': '#FF0400' };
+    const ROUTE_PATHS = {
+      'Hitch': [{dx:0,dy:-35}], 'Slant': [{dx:0,dy:-20},{dx:35,dy:-55}],
+      'Curl': [{dx:0,dy:-65},{dx:-18,dy:-45}], 'Out': [{dx:0,dy:-32},{dx:55,dy:-32}],
+      'In / Dig': [{dx:0,dy:-32},{dx:-55,dy:-32}], 'Post': [{dx:0,dy:-35},{dx:35,dy:-85}],
+      'Corner': [{dx:0,dy:-45},{dx:55,dy:-85}], 'Fade': [{dx:18,dy:-90}],
+      'Seam / Vertical': [{dx:0,dy:-110}], 'Flat / Arrow': [{dx:45,dy:-6}],
+      'Cross / Shallow': [{dx:0,dy:-18},{dx:90,dy:-18}],
+      'Comeback': [{dx:0,dy:-75},{dx:-22,dy:-55}],
+    };
+    dots.filter(d => d.route && d.side === 'offense' && !d.isLineman).forEach(d => {
+      const x = d.x * routeCanvas.width;
+      const y = d.y * routeCanvas.height;
+      const color = READ_COLORS[d.read] || 'rgba(255,255,255,0.6)';
+      const pts = ROUTE_PATHS[d.route];
+      if (!pts) return;
+      ctx.beginPath(); ctx.moveTo(x, y);
+      let lx = x, ly = y;
+      pts.forEach(p => { lx += p.dx; ly += p.dy; ctx.lineTo(lx, ly); });
+      ctx.strokeStyle = color; ctx.lineWidth = 2.5; ctx.setLineDash([6, 4]); ctx.stroke(); ctx.setLineDash([]);
+      ctx.beginPath(); ctx.arc(lx, ly, 5, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill();
+    });
+    dots.filter(d => d.isBlitzing && d.side === 'defense').forEach(d => {
+      const x = d.x * routeCanvas.width;
+      const y = d.y * routeCanvas.height;
+      const qbs = dots.filter(q => q.type === 'QB');
+      const ty = qbs.length > 0 ? qbs[0].y * routeCanvas.height : routeCanvas.height * 0.72;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, ty + 20);
+      ctx.strokeStyle = '#FF0400'; ctx.lineWidth = 2; ctx.setLineDash([8,4]); ctx.stroke(); ctx.setLineDash([]);
+      ctx.beginPath(); ctx.moveTo(x, ty+10); ctx.lineTo(x-8, ty+25); ctx.lineTo(x+8, ty+25);
+      ctx.closePath(); ctx.fillStyle = '#FF0400'; ctx.fill();
+    });
+  }
+}
+
+// ─── RESULT ───────────────────────────────────────────────────
+function showResult(icon, title, win, stat, rating, mode) {
+  document.getElementById('game-content').classList.add('hidden');
+  document.getElementById('result-content').classList.remove('hidden');
+  document.getElementById('result-content').innerHTML = `
+    <div class="result-screen">
+      <div class="result-icon">${icon}</div>
+      <div class="result-title ${win ? 'win' : 'loss'}">${title}</div>
+      <div class="result-stat">${stat}</div>
+      <div class="result-rating">${rating}</div>
+      <div class="result-actions">
+        <button class="btn btn-primary btn-lg" onclick="window.location.href='game.html?mode=${mode}'">Play Again →</button>
+        <a href="locker-room.html" class="btn btn-lg">Locker Room</a>
+      </div>
+    </div>`;
+}
+
+function renderNoFormations() {
+  document.getElementById('game-content').innerHTML = `
+    <div style="text-align:center;padding:60px 20px">
+      <div style="font-size:48px;margin-bottom:16px">📋</div>
+      <h2 class="mb-12">No Formations Yet</h2>
+      <p class="text-muted mb-24" style="font-size:14px">An admin needs to build formations in the Formation Builder before you can play.</p>
+      <a href="locker-room.html" class="btn btn-primary">Back to Locker Room →</a>
+    </div>`;
+}
+
+function formatDown(d, tg) {
+  return ['1st','2nd','3rd','4th'][d-1] + ' & ' + tg;
+}
+
+function clearIntervals() {
+  if (state.clockInterval) { clearInterval(state.clockInterval); state.clockInterval = null; }
+  if (state.pcInterval) { clearInterval(state.pcInterval); state.pcInterval = null; }
+}
+
+async function logAttempt(data) {
+  if (!state.user) return;
+  await db.from('attempts').insert({ player_id: state.user.id, ...data });
+}
+
+async function updateProfile(updates) {
+  if (!state.user || !state.profile) return;
+  state.profile = { ...state.profile, ...updates };
+  await db.from('players').update(updates).eq('id', state.user.id);
+}
+
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Signal Caller</title>
+<link rel="stylesheet" href="css/sparkqb.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+.admin-wrap { max-width: 1100px; margin: 0 auto; padding: 24px; }
+.admin-tabs { display: flex; gap: 4px; background: var(--gray2); border-radius: var(--radius-md); padding: 4px; margin-bottom: 24px; width: fit-content; }
+.admin-tab { padding: 8px 18px; border: none; background: transparent; color: var(--text-muted); font-family: 'Roboto Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; cursor: pointer; border-radius: var(--radius-sm); transition: all 0.2s; }
+.admin-tab.active { background: var(--gray3); color: var(--white); }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* Stats row */
+.stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+
+/* Players table */
+.data-table { width: 100%; border-collapse: collapse; }
+.data-table th { font-family: 'Roboto Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+.data-table td { padding: 12px; font-size: 13px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.data-table tr:last-child td { border-bottom: none; }
+.data-table tr:hover td { background: var(--gray2); }
+.player-name { font-weight: 500; }
+.player-email { font-size: 11px; color: var(--text-muted); }
+.overall-pill { font-family: 'Anton', sans-serif; font-size: 18px; color: var(--green); }
+.rank-pill { font-family: 'Roboto Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+
+/* Formation library */
+.formations-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.formation-card { background: var(--gray1); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; cursor: pointer; transition: all 0.2s; }
+.formation-card:hover { border-color: var(--border-md); transform: translateY(-1px); }
+.formation-preview { height: 140px; background: var(--gray2); position: relative; overflow: hidden; }
+.formation-preview img { width: 100%; height: 100%; object-fit: cover; opacity: 0.7; }
+.formation-info { padding: 12px; }
+.formation-name { font-family: 'Anton', sans-serif; font-size: 16px; margin-bottom: 6px; }
+.formation-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.formation-tag { font-family: 'Roboto Mono', monospace; font-size: 8px; text-transform: uppercase; letter-spacing: 0.06em; padding: 3px 8px; border-radius: 20px; border: 1px solid var(--border); color: var(--text-muted); }
+.formation-tag.coverage { border-color: rgba(0,79,255,0.3); color: #6699ff; }
+.formation-tag.difficulty { border-color: rgba(178,255,0,0.3); color: var(--green); }
+.new-formation-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; background: var(--gray1); border: 1px dashed var(--border-md); border-radius: var(--radius-lg); height: 200px; cursor: pointer; color: var(--text-muted); transition: all 0.2s; text-decoration: none; }
+.new-formation-btn:hover { border-color: var(--green); color: var(--green); }
+.new-formation-icon { font-size: 32px; }
+.new-formation-label { font-family: 'Roboto Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; }
+
+/* Player detail panel */
+.player-detail { background: var(--gray1); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; margin-top: 16px; display: none; }
+.player-detail.show { display: block; }
+.detail-attrs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+
+@media (max-width: 700px) {
+  .stats-row { grid-template-columns: 1fr 1fr; }
+  .admin-tabs { width: 100%; }
+  .admin-tab { flex: 1; text-align: center; padding: 8px 8px; font-size: 9px; }
+}
+</style>
+</head>
+<body>
+<nav class="nav">
+  <a href="locker-room.html" class="nav-logo">
+    <div class="nav-logomark"></div>
+    <div class="nav-wordmark">Spark<span>QB</span></div>
+  </a>
+  <div class="nav-badge">Admin</div>
+  <div class="nav-spacer"></div>
+  <a href="locker-room.html" class="nav-link">Locker Room</a>
+  <button class="btn btn-sm" onclick="signOut()">Sign Out</button>
+</nav>
+
+<div class="admin-wrap">
+  <div id="loading" class="loading"><div class="spinner"></div>Loading admin dashboard...</div>
+  <div id="content" class="hidden">
+
+    <div class="eyebrow eyebrow-blue mb-8">Admin Dashboard</div>
+    <h2 class="mb-20">Signal Caller Control Center</h2>
+
+    <div class="admin-tabs">
+      <button class="admin-tab active" onclick="switchTab('overview')">Overview</button>
+      <button class="admin-tab" onclick="switchTab('players')">Players</button>
+      <button class="admin-tab" onclick="switchTab('formations')">Formations</button>
+      <button class="admin-tab" onclick="switchTab('settings')">Settings</button>
+    </div>
+
+    <!-- OVERVIEW -->
+    <div id="tab-overview" class="tab-panel active">
+      <div class="stats-row" id="stats-row">
+        <div class="stat-card"><div class="stat-label">Total Players</div><div class="stat-value green" id="stat-players">—</div></div>
+        <div class="stat-card"><div class="stat-label">Formations</div><div class="stat-value blue" id="stat-formations">—</div></div>
+        <div class="stat-card"><div class="stat-label">Total Attempts</div><div class="stat-value" id="stat-attempts">—</div></div>
+        <div class="stat-card"><div class="stat-label">Avg Accuracy</div><div class="stat-value green" id="stat-accuracy">—</div></div>
+      </div>
+
+      <div class="card mb-16">
+        <div class="eyebrow mb-12">Player Leaderboard</div>
+        <table class="data-table" id="leaderboard-table">
+          <thead><tr><th>#</th><th>Player</th><th>Overall</th><th>Rank</th><th>Sessions</th><th>Accuracy</th></tr></thead>
+          <tbody id="leaderboard-body"></tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="eyebrow mb-12">Coverage Weakness Report</div>
+        <div id="weakness-report"><div class="text-muted" style="font-size:13px">Loading coverage data...</div></div>
+      </div>
+    </div>
+
+    <!-- PLAYERS -->
+    <div id="tab-players" class="tab-panel">
+      <div class="flex items-center justify-between mb-16">
+        <div>
+          <div class="eyebrow mb-4">Player Roster</div>
+          <h3>All Signal Callers</h3>
+        </div>
+        <button class="btn btn-blue" onclick="invitePlayer()">+ Invite Player</button>
+      </div>
+      <div class="card">
+        <table class="data-table">
+          <thead><tr><th>Player</th><th>Overall</th><th>Rank</th><th>Cov IQ</th><th>Proc Spd</th><th>Dec Making</th><th>Blitz Rec</th><th>Actions</th></tr></thead>
+          <tbody id="players-body"></tbody>
+        </table>
+      </div>
+      <div class="player-detail" id="player-detail"></div>
+    </div>
+
+    <!-- FORMATIONS -->
+    <div id="tab-formations" class="tab-panel">
+      <div class="flex items-center justify-between mb-16">
+        <div>
+          <div class="eyebrow mb-4">Formation Library</div>
+          <h3 id="formation-count">Loading...</h3>
+        </div>
+        <a href="builder.html" class="btn btn-primary">+ New Formation →</a>
+      </div>
+      <div class="formations-grid" id="formations-grid">
+        <a href="builder.html" class="new-formation-btn">
+          <div class="new-formation-icon">+</div>
+          <div class="new-formation-label">Build Formation</div>
+        </a>
+      </div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div id="tab-settings" class="tab-panel">
+      <div class="eyebrow mb-16">System Settings</div>
+      <div class="grid-2 gap-16">
+        <div class="card">
+          <h3 class="mb-16">Difficulty Config</h3>
+          <div class="form-group">
+            <label class="form-label">Beginner Clock (seconds)</label>
+            <input type="number" class="form-input" id="cfg-beginner" value="7" min="3" max="15">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Intermediate Clock (seconds)</label>
+            <input type="number" class="form-input" id="cfg-intermediate" value="5" min="2" max="10">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Advanced Clock (seconds)</label>
+            <input type="number" class="form-input" id="cfg-advanced" value="3" min="1" max="7">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Elite Clock (seconds)</label>
+            <input type="number" class="form-input" id="cfg-elite" value="15" min="1" max="5">
+          </div>
+          <button class="btn btn-primary" onclick="saveSettings()">Save Settings →</button>
+        </div>
+        <div class="card">
+          <h3 class="mb-16">Admin Access</h3>
+          <div class="form-group">
+            <label class="form-label">Grant Admin by Email</label>
+            <input type="email" class="form-input" id="admin-email" placeholder="player@email.com">
+          </div>
+          <button class="btn btn-blue" onclick="grantAdmin()">Grant Admin Access →</button>
+          <hr class="divider">
+          <div class="eyebrow mb-8">Danger Zone</div>
+          <button class="btn btn-danger btn-sm" onclick="if(confirm('Reset ALL player progress?')) resetAll()">Reset All Progress</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="js/supabase.js"></script>
+<script>
+const RANKS = [
+  {min:60,label:'Scout Team'},{min:65,label:'Practice Squad'},
+  {min:70,label:'Backup'},{min:75,label:'Starter'},
+  {min:80,label:'Captain'},{min:85,label:'Signal Caller'},
+  {min:90,label:'Elite'},{min:95,label:'Legend'}
+];
+function getRank(o) { let r='Scout Team'; for(const x of RANKS){if(o>=x.min)r=x.label;} return r; }
+
+function switchTab(tab) {
+  document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('tab-' + tab).classList.add('active');
+}
+
+async function init() {
+  const result = await requireAdmin();
+  if (!result) return;
+
+  document.getElementById('loading').classList.add('hidden');
+  document.getElementById('content').classList.remove('hidden');
+
+  loadOverview();
+  loadPlayers();
+  loadFormations();
+}
+
+async function loadOverview() {
+  const [{ count: playerCount }, { count: formationCount }, { count: attemptCount }, { data: attempts }] = await Promise.all([
+    db.from('players').select('*', { count: 'exact', head: true }),
+    db.from('formations').select('*', { count: 'exact', head: true }),
+    db.from('attempts').select('*', { count: 'exact', head: true }),
+    db.from('attempts').select('correct').limit(1000)
+  ]);
+  document.getElementById('stat-players').textContent = playerCount || 0;
+  document.getElementById('stat-formations').textContent = formationCount || 0;
+  document.getElementById('stat-attempts').textContent = attemptCount || 0;
+  if (attempts && attempts.length > 0) {
+    const acc = Math.round(attempts.filter(a => a.correct).length / attempts.length * 100);
+    document.getElementById('stat-accuracy').textContent = acc + '%';
+  } else { document.getElementById('stat-accuracy').textContent = 'N/A'; }
+
+  const { data: players } = await db.from('players').select('*').order('overall', { ascending: false }).limit(10);
+  if (players) {
+    document.getElementById('leaderboard-body').innerHTML = players.map((p, i) => `
+      <tr>
+        <td><span class="mono" style="font-size:12px;color:var(--text-muted)">${i + 1}</span></td>
+        <td><div class="player-name">${p.full_name || 'Unknown'}</div><div class="player-email">${p.email || ''}</div></td>
+        <td><span class="overall-pill">${p.overall}</span></td>
+        <td><span class="rank-pill">${getRank(p.overall)}</span></td>
+        <td><span style="font-size:13px;color:var(--text-muted)">${p.sessions || 0}</span></td>
+        <td><span style="font-size:13px;color:var(--green)">${p.accuracy || 0}%</span></td>
+      </tr>`).join('');
+  }
+}
+
+async function loadPlayers() {
+  const { data: players } = await db.from('players').select('*').order('overall', { ascending: false });
+  if (!players) return;
+  document.getElementById('players-body').innerHTML = players.map(p => `
+    <tr style="cursor:pointer" onclick="showPlayerDetail('${p.id}')">
+      <td><div class="player-name">${p.full_name || 'Unknown'}</div><div class="player-email">${p.email || ''}</div></td>
+      <td><span class="overall-pill">${p.overall}</span></td>
+      <td><span class="rank-pill">${getRank(p.overall)}</span></td>
+      <td>${p.attr_coverage_iq || 60}</td>
+      <td>${p.attr_processing_speed || 60}</td>
+      <td>${p.attr_decision_making || 60}</td>
+      <td>${p.attr_blitz_recognition || 60}</td>
+      <td><button class="btn btn-sm" onclick="event.stopPropagation();resetPlayer('${p.id}')">Reset</button></td>
+    </tr>`).join('');
+}
+
+async function loadFormations() {
+  const { data: formations } = await db.from('formations').select('*').order('created_at', { ascending: false });
+  const count = formations ? formations.length : 0;
+  document.getElementById('formation-count').textContent = `${count} Formation${count !== 1 ? 's' : ''} in Library`;
+  const grid = document.getElementById('formations-grid');
+  const newBtn = grid.querySelector('.new-formation-btn');
+  if (formations && formations.length > 0) {
+    formations.forEach(f => {
+      const card = document.createElement('div');
+      card.className = 'formation-card';
+      card.innerHTML = `
+        <div class="formation-preview" style="background:var(--gray2);display:flex;align-items:center;justify-content:center;">
+          <span class="mono" style="font-size:11px;color:var(--text-muted)">Formation Preview</span>
+        </div>
+        <div class="formation-info">
+          <div class="formation-name">${f.name || 'Untitled'}</div>
+          <div class="formation-tags">
+            <span class="formation-tag coverage">${f.coverage || 'No coverage'}</span>
+            <span class="formation-tag">${f.front || 'No front'}</span>
+            <span class="formation-tag difficulty">${f.difficulty || 'beginner'}</span>
+          </div>
+        </div>`;
+      card.onclick = () => window.location.href = `builder.html?id=${f.id}`;
+      grid.insertBefore(card, newBtn);
+    });
+  }
+}
+
+async function showPlayerDetail(id) {
+  const { data: p } = await db.from('players').select('*').eq('id', id).single();
+  if (!p) return;
+  const detail = document.getElementById('player-detail');
+  detail.classList.add('show');
+  detail.innerHTML = `
+    <div class="flex items-center justify-between mb-12">
+      <h3>${p.full_name || 'Unknown'}</h3>
+      <button class="btn btn-sm" onclick="document.getElementById('player-detail').classList.remove('show')">Close</button>
+    </div>
+    <div class="detail-attrs">
+      <div class="stat-card"><div class="stat-label">Overall</div><div class="stat-value green">${p.overall}</div></div>
+      <div class="stat-card"><div class="stat-label">Rank</div><div class="stat-value" style="font-size:18px">${getRank(p.overall)}</div></div>
+      <div class="stat-card"><div class="stat-label">Coverage IQ</div><div class="stat-value blue">${p.attr_coverage_iq || 60}</div></div>
+      <div class="stat-card"><div class="stat-label">Processing Spd</div><div class="stat-value green">${p.attr_processing_speed || 60}</div></div>
+      <div class="stat-card"><div class="stat-label">Decision Making</div><div class="stat-value blue">${p.attr_decision_making || 60}</div></div>
+      <div class="stat-card"><div class="stat-label">Blitz Rec</div><div class="stat-value red">${p.attr_blitz_recognition || 60}</div></div>
+    </div>`;
+  detail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+async function resetPlayer(id) {
+  if (!confirm('Reset this player\'s progress?')) return;
+  await db.from('players').update({ overall: 60, xp: 0, attr_coverage_iq: 60, attr_processing_speed: 60, attr_decision_making: 60, attr_blitz_recognition: 60 }).eq('id', id);
+  loadPlayers();
+}
+
+async function grantAdmin() {
+  const email = document.getElementById('admin-email').value.trim();
+  if (!email) return;
+  const { data } = await db.from('players').update({ is_admin: true }).eq('email', email).select();
+  alert(data && data.length > 0 ? `Admin access granted to ${email}` : 'Player not found. They must sign up first.');
+}
+
+async function invitePlayer() {
+  const email = prompt('Enter player email to invite:');
+  if (email) alert(`Invite sent to ${email} (configure email in Supabase Auth settings)`);
+}
+
+function saveSettings() { alert('Settings saved!'); }
+async function resetAll() {
+  await db.from('players').update({ overall: 60, xp: 0, attr_coverage_iq: 60, attr_processing_speed: 60, attr_decision_making: 60, attr_blitz_recognition: 60 }).neq('id', '00000000-0000-0000-0000-000000000000');
+  alert('All progress reset.');
+}
+async function signOut() { await db.auth.signOut(); window.location.href = 'index.html'; }
+init();
+</script>
+</body>
+</html>

@@ -117,6 +117,7 @@
 </div>
 
 <script src="js/supabase.js"></script>
+<script src="js/curriculum.js"></script>
 <script>
 const params = new URLSearchParams(window.location.search);
 const MODE = params.get('mode') || 'quickreps';
@@ -128,19 +129,30 @@ const SITUATIONS = [
   {down:'Red Zone',hash:'Middle',zone:'Red Zone'},
   {down:'2-Min Drill',hash:'Middle',zone:'Two Minute'},
 ];
-const CONCEPTS_BY_COVERAGE = {
-  'Cover 2': ['Four Verticals','Smash','Double Slants','Flood'],
-  'Cover 3': ['Four Verticals','Flood','Slant/Arrow','Mesh'],
-  'Cover 4': ['Hitches','Slant/Arrow','Post/Dig','Flood'],
-  'Man Free (Cover 1)': ['Crossers','Pick Routes','Quick Game','Motions'],
-  'Cover 0': ['Hot Routes','Back Out of Backfield','Smoke Routes','Fade/Back Shoulder'],
-  '2-Man': ['Run the Ball','QB Draw','Crossers/Pick Routes','Quick Game'],
-  'Cover 6': ['Four Verticals','Flood','Slant/Arrow','Spacing'],
-  'Tampa 2': ['Seam Routes','Mesh','Post/Dig','Four Verticals'],
-  'Cover 3 Cloud': ['Flood','Four Verticals','Slant/Arrow','Mesh'],
-  'PALMS': ['Four Verticals','Flood','Post/Dig','Smash'],
-};
-const ALL_COVERAGES = Object.keys(CONCEPTS_BY_COVERAGE);
+// Pull concepts from curriculum if available, fallback to defaults
+function getConceptsForCoverage(coverage) {
+  if (typeof CURRICULUM !== 'undefined' && CURRICULUM.coverages[coverage]) {
+    return CURRICULUM.coverages[coverage].concepts_that_beat.map(c => c.concept);
+  }
+  const fallback = {
+    'Cover 2': ['Four Verticals','Smash','Double Slants','Flood'],
+    'Cover 3': ['Four Verticals','Flood','Slant/Arrow','Mesh'],
+    'Cover 4': ['Hitches','Slant/Arrow','Post/Dig','Flood'],
+    'Man Free (Cover 1)': ['Crossers','Pick Routes','Quick Game','Motions'],
+    'Cover 0': ['Hot Routes','Back Out of Backfield','Smoke Routes','Fade/Back Shoulder'],
+    '2-Man': ['Run the Ball','QB Draw','Crossers/Pick Routes','Quick Game'],
+    'Cover 6': ['Four Verticals','Flood','Slant/Arrow','Spacing'],
+    'Tampa 2': ['Seam Routes','Mesh','Post/Dig','Four Verticals'],
+    'Cover 3 Cloud': ['Flood','Four Verticals','Slant/Arrow','Mesh'],
+    'Cover 3 Sky': ['Flood','Slant/Arrow','Away from rotation','Four Verticals'],
+    'Cover 3 Buzz': ['Flood','Four Verticals','Slant/Arrow','Mesh'],
+    'Tampa 2': ['Underneath routes','QB Draw','Run game','Mesh'],
+  };
+  return fallback[coverage] || ['Four Verticals', 'Mesh', 'Flood', 'Smash'];
+}
+const ALL_COVERAGES = typeof CURRICULUM !== 'undefined'
+  ? Object.keys(CURRICULUM.coverages)
+  : ['Cover 2','Cover 3','Cover 4','Man Free (Cover 1)','Cover 0','2-Man','Cover 6','Tampa 2','Cover 3 Cloud','Cover 3 Sky'];
 
 let state = {
   user: null, profile: null,
@@ -280,11 +292,22 @@ function answerQR(chosen, correct, btn) {
     else if (b === btn && !isCorrect) b.classList.add('wrong');
   });
   const filmWrap = document.getElementById('film-card-wrap');
-  if (filmWrap) filmWrap.innerHTML = `
-    <div class="film-card">
-      <div class="film-label">📽 Film Review</div>
-      <div class="film-text"><strong>${correct}</strong> — ${isCorrect ? '✓ Correct! ' : '✗ Missed. '}${state.currentFormation?.film_notes || 'Study the pre-snap keys for this coverage.'}</div>
-    </div>`;
+  if (filmWrap) {
+    const curriculumFilm = typeof CURRICULUM !== 'undefined' && CURRICULUM.coverages[correct]
+      ? CURRICULUM.coverages[correct].film_review
+      : (typeof CURRICULUM !== 'undefined' && CURRICULUM.film_review_fallbacks[correct])
+        ? CURRICULUM.film_review_fallbacks[correct]
+        : null;
+    const filmText = state.currentFormation?.film_notes || curriculumFilm || 'Study the pre-snap keys for this coverage.';
+    const preSnapKeys = typeof CURRICULUM !== 'undefined' && CURRICULUM.coverages[correct]
+      ? '<br><br><strong>Pre-snap keys:</strong> ' + CURRICULUM.coverages[correct].pre_snap_keys[0]
+      : '';
+    filmWrap.innerHTML = `
+      <div class="film-card">
+        <div class="film-label">📽 Film Review</div>
+        <div class="film-text"><strong>${correct}</strong> — ${isCorrect ? '✓ Correct read! ' : '✗ Missed. '}${filmText}${!isCorrect ? preSnapKeys : ''}</div>
+      </div>`;
+  }
 
   const revealWrap = document.getElementById('reveal-wrap');
   if (revealWrap && state.currentFormation?.dots) {
@@ -415,7 +438,7 @@ function answerDMCoverage(chosen, correct, btn) {
 
 function renderConceptPhase() {
   const f = state.currentFormation;
-  const goodConcepts = CONCEPTS_BY_COVERAGE[f.coverage] || ['Four Verticals', 'Mesh', 'Flood', 'Smash'];
+  const goodConcepts = getConceptsForCoverage(f.coverage);
   const correct = goodConcepts[0];
   const allConcepts = ['Four Verticals','Mesh','Smash','Flood','Slant/Arrow','Post/Dig','Spacing','Hitch/Seam','Crossers','Pick Routes'];
   const wrong = allConcepts.filter(c => !goodConcepts.includes(c));
@@ -489,11 +512,23 @@ function resolvePlay() {
       <div class="outcome-desc">${bothCorrect ? 'Good read! The coverage was open to that concept.' : 'Wrong coverage or concept — the defense had you covered.'}</div>
     </div>`;
   const filmWrap = document.getElementById('film-card-wrap');
-  if (filmWrap) filmWrap.innerHTML = `
-    <div class="film-card">
-      <div class="film-label">📽 Film Review</div>
-      <div class="film-text">${f?.film_notes || 'Study the pre-snap keys for this coverage.'}</div>
-    </div>`;
+  if (filmWrap) {
+    const coverage = f?.coverage || '';
+    const curriculumFilm = typeof CURRICULUM !== 'undefined' && CURRICULUM.coverages[coverage]
+      ? CURRICULUM.coverages[coverage].film_review
+      : (typeof CURRICULUM !== 'undefined' && CURRICULUM.film_review_fallbacks[coverage])
+        ? CURRICULUM.film_review_fallbacks[coverage]
+        : null;
+    const filmText = f?.film_notes || curriculumFilm || 'Study the pre-snap keys for this coverage.';
+    const conceptHint = !bothCorrect && typeof CURRICULUM !== 'undefined' && CURRICULUM.coverages[coverage]
+      ? '<br><br><strong>What beats it:</strong> ' + CURRICULUM.coverages[coverage].concepts_that_beat.slice(0,2).map(c => c.concept + ' — ' + c.why).join('. ')
+      : '';
+    filmWrap.innerHTML = `
+      <div class="film-card">
+        <div class="film-label">📽 Film Review</div>
+        <div class="film-text">${filmText}${conceptHint}</div>
+      </div>`;
+  }
 
   if (bothCorrect) {
     state.driveYardline = Math.min(99, state.driveYardline + ydsGained);

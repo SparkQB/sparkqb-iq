@@ -492,15 +492,16 @@ const thumbCache = {};
 async function fetchThumb(url, idx) {
   if (thumbCache[idx]) return thumbCache[idx];
   try {
-    const videoId = url.match(/vimeo\.com\/(\d+)/)?.[1];
-    if (!videoId) return null;
-    const res = await fetch(`https://vimeo.com/api/v2/video/${videoId}.json`);
+    // Use oEmbed endpoint — works with private/unlisted Vimeo videos
+    const encodedUrl = encodeURIComponent(url);
+    const res = await fetch(`https://vimeo.com/api/oembed.json?url=${encodedUrl}&width=640`);
+    if (!res.ok) return null;
     const data = await res.json();
-    const thumb = data[0]?.thumbnail_large || data[0]?.thumbnail_medium || null;
+    const thumb = data?.thumbnail_url || null;
+    if (!thumb) return null;
     thumbCache[idx] = thumb;
-    // Update the img tag if already rendered
     const imgEl = document.getElementById(`thumb-${idx}`);
-    if (imgEl && thumb) {
+    if (imgEl) {
       imgEl.src = thumb;
       imgEl.style.display = 'block';
       const placeholder = document.getElementById(`placeholder-${idx}`);

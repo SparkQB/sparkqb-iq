@@ -3,104 +3,253 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Locker Room — Signal Caller</title>
+<title>Film Room — Signal Caller</title>
 <link rel="stylesheet" href="css/sparkqb.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-.locker-wrap { max-width: 800px; margin: 0 auto; padding: 24px; }
-.overall-card {
+.library-wrap { max-width: 1100px; margin: 0 auto; padding: 24px; }
+
+/* Hero */
+.library-hero {
   background: var(--gray1);
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
-  padding: 24px;
+  padding: 28px;
+  margin-bottom: 24px;
   display: flex;
   align-items: center;
-  gap: 24px;
-  margin-bottom: 16px;
+  justify-content: space-between;
+  gap: 20px;
 }
-.overall-num {
-  font-family: 'Anton', sans-serif;
-  font-size: 80px;
-  color: var(--green);
-  line-height: 1;
-  flex-shrink: 0;
-  min-width: 100px;
-  text-align: center;
-}
-.overall-info { flex: 1; }
-.overall-name { font-family: 'Anton', sans-serif; font-size: 28px; margin-bottom: 2px; }
-.overall-rank {
-  font-family: 'Roboto Mono', monospace; font-size: 10px;
-  text-transform: uppercase; letter-spacing: 0.1em;
-  color: var(--green); margin-bottom: 12px;
-}
-.xp-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-.xp-label { font-family: 'Roboto Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+.hero-left h1 { font-size: clamp(28px, 4vw, 40px); margin-bottom: 6px; }
+.hero-stat { font-family: 'Roboto Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); }
+.hero-stat span { color: var(--green); }
+.hero-right { display: flex; gap: 10px; flex-shrink: 0; }
 
-.scout-card {
-  background: var(--gray2);
-  border-left: 3px solid var(--red);
-  border-radius: 0 var(--radius-md) var(--radius-md) 0;
-  padding: 16px;
-  margin-bottom: 16px;
+/* Search */
+.search-wrap { position: relative; margin-bottom: 20px; }
+.search-input {
+  width: 100%;
+  background: var(--gray1);
+  border: 1px solid var(--border-md);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px 14px 44px;
+  color: var(--white);
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.2s;
 }
-.scout-eyebrow { font-family: 'Roboto Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--red); margin-bottom: 6px; }
-.scout-text { font-size: 14px; color: var(--text-secondary); line-height: 1.6; }
+.search-input:focus { border-color: var(--blue); }
+.search-input::placeholder { color: var(--text-muted); }
+.search-icon { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 16px; pointer-events: none; }
 
-.mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
-.mode-card {
+/* Filter tabs */
+.filter-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 24px; }
+.filter-tab {
+  padding: 7px 14px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: 'Roboto Mono', monospace;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.filter-tab:hover { border-color: var(--border-md); color: var(--white); }
+.filter-tab.active { border-color: var(--green); color: var(--green); background: rgba(178,255,0,0.06); }
+
+/* Category sections */
+.category-section { margin-bottom: 32px; }
+.category-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.category-icon { font-size: 20px; }
+.category-name { font-family: 'Anton', sans-serif; font-size: 22px; }
+.category-count { font-family: 'Roboto Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); }
+
+/* Video grid */
+.video-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+
+/* Video card */
+.video-card {
   background: var(--gray1);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: 20px;
+  overflow: hidden;
   cursor: pointer;
-  text-decoration: none;
-  color: var(--white);
   transition: all 0.2s;
+  position: relative;
+}
+.video-card:hover { border-color: var(--border-md); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+.video-thumb {
+  position: relative;
+  width: 100%;
+  padding-top: 56.25%;
+  background: var(--gray2);
+  overflow: hidden;
+}
+.video-thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.video-thumb-placeholder {
+  position: absolute;
+  inset: 0;
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--gray2);
 }
-.mode-card:hover { border-color: var(--green); background: var(--gray2); transform: translateY(-1px); }
-.mode-icon { font-size: 28px; margin-bottom: 12px; }
-.mode-title { font-family: 'Anton', sans-serif; font-size: 20px; margin-bottom: 4px; }
-.mode-sub { font-family: 'Roboto Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
-
-.badges-section { margin-bottom: 20px; }
-.badges-wrap { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
-
-.recent-section {}
-.recent-row {
-  display: flex; align-items: center; gap: 12px;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--border);
-  font-size: 13px;
-}
-.recent-row:last-child { border-bottom: none; }
-.recent-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.recent-dot.correct { background: var(--green); }
-.recent-dot.wrong { background: var(--red); }
-.recent-coverage { font-family: 'Roboto Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-secondary); width: 120px; flex-shrink: 0; }
-.recent-result { color: var(--text-muted); flex: 1; }
-.recent-time { font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--text-muted); }
-
-.admin-link {
-  display: flex; align-items: center; justify-content: space-between;
-  background: rgba(0,79,255,0.08);
-  border: 1px solid rgba(0,79,255,0.25);
-  border-radius: var(--radius-md);
-  padding: 14px 16px;
-  text-decoration: none;
-  color: var(--white);
-  margin-bottom: 16px;
+.play-btn {
+  width: 48px; height: 48px;
+  background: rgba(178,255,0,0.15);
+  border: 2px solid var(--green);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: all 0.2s;
 }
-.admin-link:hover { background: rgba(0,79,255,0.14); border-color: rgba(0,79,255,0.4); }
-.admin-link-text { font-family: 'Roboto Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: #6699ff; }
-.admin-link-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.video-card:hover .play-btn {
+  background: var(--green);
+  box-shadow: 0 0 20px rgba(178,255,0,0.4);
+}
+.play-arrow {
+  width: 0; height: 0;
+  border-style: solid;
+  border-width: 8px 0 8px 16px;
+  border-color: transparent transparent transparent var(--green);
+  margin-left: 3px;
+  transition: border-color 0.2s;
+}
+.video-card:hover .play-arrow { border-color: transparent transparent transparent var(--black); }
+.video-duration {
+  position: absolute;
+  bottom: 8px; right: 8px;
+  background: rgba(0,0,0,0.8);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: 'Roboto Mono', monospace;
+  font-size: 9px;
+  color: var(--white);
+}
+.video-info { padding: 14px; }
+.video-title { font-size: 14px; font-weight: 500; margin-bottom: 8px; line-height: 1.4; }
+.video-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.video-tag {
+  font-family: 'Roboto Mono', monospace;
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 3px 8px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+.video-tag.coverage { border-color: rgba(0,79,255,0.3); color: #6699ff; }
+.video-tag.front { border-color: rgba(255,140,0,0.3); color: #ffaa44; }
+.video-tag.concept { border-color: rgba(178,255,0,0.3); color: var(--green); }
+.video-tag.comparison { border-color: rgba(255,4,0,0.3); color: #ff6666; }
 
-@media (max-width: 520px) {
-  .overall-card { flex-direction: column; text-align: center; }
-  .mode-grid { grid-template-columns: 1fr; }
+/* Video modal */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.92);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+.modal-overlay.show { opacity: 1; pointer-events: all; }
+.modal-box {
+  width: 100%;
+  max-width: 900px;
+  background: var(--gray1);
+  border: 1px solid var(--border-md);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.modal-title { font-family: 'Anton', sans-serif; font-size: 20px; }
+.modal-close {
+  background: var(--gray2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  cursor: pointer;
+  color: var(--white);
+  font-family: 'Roboto Mono', monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  transition: all 0.2s;
+}
+.modal-close:hover { border-color: var(--red); color: var(--red); }
+.modal-video {
+  position: relative;
+  width: 100%;
+  padding-top: 56.25%;
+  background: #000;
+}
+.modal-video iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+.modal-footer {
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.modal-tags { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; }
+.modal-nav { display: flex; gap: 8px; }
+
+/* No results */
+.no-results {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-muted);
+}
+.no-results-icon { font-size: 48px; margin-bottom: 16px; }
+
+/* Progress tracker */
+.progress-card {
+  background: var(--gray2);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.progress-card-label { font-family: 'Roboto Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 4px; }
+.progress-card-val { font-family: 'Anton', sans-serif; font-size: 22px; color: var(--green); }
+
+@media (max-width: 600px) {
+  .library-hero { flex-direction: column; }
+  .hero-right { width: 100%; }
+  .hero-right .btn { flex: 1; justify-content: center; }
+  .video-grid { grid-template-columns: 1fr; }
 }
 </style>
 </head>
@@ -110,198 +259,314 @@
     <div class="nav-logomark"></div>
     <div class="nav-wordmark">Spark<span>QB</span></div>
   </a>
-  <div class="nav-badge">Signal Caller</div>
+  <div class="nav-badge">Film Room</div>
   <div class="nav-spacer"></div>
-  <a href="library.html" class="nav-link">Film Room</a>
-  <span class="nav-user" id="nav-user"></span>
-  <button class="btn btn-sm" onclick="signOut()">Sign Out</button>
+  <a href="game.html?mode=quickreps" class="nav-link">Quick Reps</a>
+  <a href="game.html?mode=drive" class="nav-link">Drive Mode</a>
+  <a href="locker-room.html" class="nav-link">Locker Room</a>
 </nav>
 
-<div class="locker-wrap">
-  <div id="loading" class="loading"><div class="spinner"></div>Loading locker room...</div>
-  <div id="content" class="hidden">
+<div class="library-wrap">
+  <div class="library-hero">
+    <div class="hero-left">
+      <div class="eyebrow eyebrow-green mb-8">Film Room</div>
+      <h1>Video Curriculum</h1>
+      <div class="hero-stat"><span>46</span> videos · Coverages · Fronts · Concepts</div>
+    </div>
+    <div class="hero-right">
+      <a href="game.html?mode=quickreps" class="btn btn-primary">Test Your Knowledge →</a>
+    </div>
+  </div>
 
-    <div class="eyebrow eyebrow-green mb-8">Locker Room</div>
-    <h2 class="mb-16" id="greeting">Welcome back</h2>
-
-    <div class="overall-card">
-      <div class="overall-num" id="lr-overall">60</div>
-      <div class="overall-info">
-        <div class="overall-name" id="lr-name">Signal Caller</div>
-        <div class="overall-rank" id="lr-rank">Scout Team</div>
-        <div class="xp-row">
-          <div class="xp-label" id="lr-xp-label">0 / 1000 XP to next rank</div>
-          <div class="xp-label" id="lr-xp-pct">0%</div>
-        </div>
-        <div class="progress-wrap">
-          <div class="progress-fill green" id="lr-xp-bar" style="width:0%"></div>
-        </div>
+  <div class="progress-card">
+    <div>
+      <div class="progress-card-label">Study Progress</div>
+      <div class="progress-card-val" id="watched-count">0 / 46</div>
+    </div>
+    <div style="flex:1">
+      <div class="progress-wrap" style="height:8px">
+        <div class="progress-fill green" id="watched-bar" style="width:0%"></div>
       </div>
     </div>
+    <div class="mono" style="font-size:9px;color:var(--text-muted)">Videos Watched</div>
+  </div>
 
-    <div class="card mb-16">
-      <div class="eyebrow mb-12">Attributes</div>
-      <div id="attrs-list"></div>
+  <div class="search-wrap">
+    <div class="search-icon">🔍</div>
+    <input type="text" class="search-input" id="search-input" placeholder="Search videos — try 'Cover 2' or 'blitz' or 'fronts'..." oninput="filterVideos()">
+  </div>
+
+  <div class="filter-tabs" id="filter-tabs">
+    <button class="filter-tab active" onclick="setFilter('all', this)">All Videos (46)</button>
+    <button class="filter-tab" onclick="setFilter('coverage', this)">Coverages</button>
+    <button class="filter-tab" onclick="setFilter('front', this)">Fronts</button>
+    <button class="filter-tab" onclick="setFilter('comparison', this)">Comparisons</button>
+    <button class="filter-tab" onclick="setFilter('concept', this)">Concepts</button>
+  </div>
+
+  <div id="library-content"></div>
+</div>
+
+<!-- VIDEO MODAL -->
+<div class="modal-overlay" id="modal" onclick="handleModalClick(event)">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-title">Video Title</div>
+      <button class="modal-close" onclick="closeModal()">✕ Close</button>
     </div>
-
-    <div class="scout-card">
-      <div class="scout-eyebrow">Today's Scouting Report</div>
-      <div class="scout-text" id="scout-text">Loading your scouting report...</div>
+    <div class="modal-video">
+      <iframe id="modal-iframe" src="" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>
     </div>
-
-    <div id="admin-section" class="hidden">
-      <a href="admin.html" class="admin-link">
-        <div>
-          <div class="admin-link-text">Admin Dashboard</div>
-          <div class="admin-link-sub">Manage formations, players, and curriculum</div>
-        </div>
-        <div style="color:#6699ff;font-size:18px">→</div>
-      </a>
-    </div>
-
-    <div class="mode-grid">
-      <a href="game.html?mode=quickreps" class="mode-card">
-        <div class="mode-icon">⚡</div>
-        <div class="mode-title">Quick Reps</div>
-        <div class="mode-sub">10 plays · ID the coverage · Daily habit</div>
-      </a>
-      <a href="game.html?mode=drive" class="mode-card">
-        <div class="mode-icon">🏈</div>
-        <div class="mode-title">Drive Mode</div>
-        <div class="mode-sub">Call plays · Score TDs · Full progression</div>
-      </a>
-      <a href="library.html" class="mode-card" style="grid-column: span 2;">
-        <div class="mode-icon">📽</div>
-        <div class="mode-title">Film Room</div>
-        <div class="mode-sub">46 videos · Coverages · Fronts · Study before you play</div>
-      </a>
-    </div>
-
-    <div class="badges-section card mb-16">
-      <div class="eyebrow mb-4">Badges</div>
-      <div class="badges-wrap" id="badges-wrap"></div>
-    </div>
-
-    <div class="card">
-      <div class="eyebrow mb-12">Recent Activity</div>
-      <div id="recent-list">
-        <div class="text-muted" style="font-size:13px;padding:12px 0">No recent activity yet. Start with Quick Reps!</div>
+    <div class="modal-footer">
+      <div class="modal-tags" id="modal-tags"></div>
+      <div class="modal-nav">
+        <button class="btn btn-sm" id="prev-btn" onclick="navVideo(-1)">← Prev</button>
+        <button class="btn btn-sm" id="next-btn" onclick="navVideo(1)">Next →</button>
       </div>
     </div>
-
   </div>
 </div>
 
 <script src="js/supabase.js"></script>
 <script>
-const RANKS = [
-  {min:60,label:'Scout Team'},{min:65,label:'Practice Squad'},
-  {min:70,label:'Backup'},{min:75,label:'Starter'},
-  {min:80,label:'Captain'},{min:85,label:'Signal Caller'},
-  {min:90,label:'Elite'},{min:95,label:'Legend'}
-];
-const ATTRS = [
-  {key:'attr_coverage_iq',label:'Coverage IQ',color:'blue'},
-  {key:'attr_processing_speed',label:'Processing Speed',color:'green'},
-  {key:'attr_decision_making',label:'Decision Making',color:'blue'},
-  {key:'attr_blitz_recognition',label:'Blitz Recognition',color:'red'}
-];
-const BADGES_DEF = [
-  {id:'coverage_rookie',label:'Coverage Rookie',desc:'Complete first Quick Reps session'},
-  {id:'blitz_buster',label:'Blitz Buster',desc:'ID Cover 0 correctly 5 times in a row'},
-  {id:'ice_veins',label:'Ice Veins',desc:'Score TD drive with sub-2s avg reaction'},
-  {id:'film_nerd',label:'Film Nerd',desc:'Complete 10 sessions'},
-  {id:'signal_caller',label:'Signal Caller',desc:'Reach 85 overall'},
-  {id:'legend',label:'Legend',desc:'Reach 95 overall'},
+const VIDEOS = [
+  // COMPARISONS
+  { title: 'How to Tell: Cover 3 vs Cover 1', url: 'https://vimeo.com/1000620551/cf7c74b88d', category: 'comparison', tags: ['Cover 3', 'Cover 1', 'ID Keys'], priority: 1 },
+  { title: 'How to Tell: Cover 2 vs Cover 4', url: 'https://vimeo.com/1000615849/5081a0c41e', category: 'comparison', tags: ['Cover 2', 'Cover 4', 'ID Keys'], priority: 1 },
+  { title: 'Cover 2 vs Closed Formation', url: 'https://vimeo.com/1000619667/56ca446265', category: 'comparison', tags: ['Cover 2', 'Formation'], priority: 2 },
+  { title: 'Cover 3 vs Closed Formation', url: 'https://vimeo.com/1000619957/684c859e61', category: 'comparison', tags: ['Cover 3', 'Formation'], priority: 2 },
+
+  // COVER 2 FAMILY
+  { title: 'Cover 2 Overview', url: 'https://vimeo.com/1000615511/c33249c4b4', category: 'coverage', tags: ['Cover 2', 'Overview'], priority: 1 },
+  { title: 'Cover 2 Strengths & Weaknesses', url: 'https://vimeo.com/1000615341/338d23af37', category: 'coverage', tags: ['Cover 2', 'S&W'], priority: 1 },
+  { title: 'Cover 2 Corners Responsibilities', url: 'https://vimeo.com/1000614034/bd62071a27', category: 'coverage', tags: ['Cover 2', 'CB'], priority: 2 },
+  { title: 'Cover 2 Safeties Responsibilities', url: 'https://vimeo.com/1000614097/8a603bff64', category: 'coverage', tags: ['Cover 2', 'Safety'], priority: 2 },
+  { title: 'Cover 2 Robber', url: 'https://vimeo.com/1000619578/05be1fc4d6', category: 'coverage', tags: ['Cover 2', 'Variant'], priority: 2 },
+  { title: 'Cover 2 Trap', url: 'https://vimeo.com/1000614859/4166a677b8', category: 'coverage', tags: ['Cover 2', 'Variant'], priority: 2 },
+  { title: 'Cover 2 Read', url: 'https://vimeo.com/1000614160/6ad7643f38', category: 'coverage', tags: ['Cover 2', 'Variant'], priority: 2 },
+  { title: 'Cover 2 Buzz Overview', url: 'https://vimeo.com/1000613815/bf78f8361e', category: 'coverage', tags: ['Cover 2', 'Buzz'], priority: 2 },
+  { title: 'Tampa 2 Overview', url: 'https://vimeo.com/1000614944/9e869e827b', category: 'coverage', tags: ['Tampa 2', 'Cover 2'], priority: 2 },
+
+  // COVER 2 MAN
+  { title: 'Cover 2 Man Overview', url: 'https://vimeo.com/1000615618/9793cd40e4', category: 'coverage', tags: ['2-Man', 'Man Coverage'], priority: 2 },
+
+  // COVER 3 FAMILY
+  { title: 'Cover 3 Buzz Overview', url: 'https://vimeo.com/1000619754/f872d51d21', category: 'coverage', tags: ['Cover 3', 'Buzz'], priority: 1 },
+  { title: 'Cover 3 Sky Overview', url: 'https://vimeo.com/1000619877/6d43ae253f', category: 'coverage', tags: ['Cover 3', 'Sky'], priority: 1 },
+  { title: 'Cover 3 Mable Overview', url: 'https://vimeo.com/1000615167/0d6c114da0', category: 'coverage', tags: ['Cover 3', 'Mable'], priority: 2 },
+  { title: '4-3 Cover 3 Cloud', url: 'https://vimeo.com/1000618875/993b89e466', category: 'coverage', tags: ['Cover 3', 'Cloud', '4-3'], priority: 2 },
+  { title: '4-4 Cover 3 Overview', url: 'https://vimeo.com/1000619011/633b3c4d0d', category: 'coverage', tags: ['Cover 3', '4-4'], priority: 2 },
+  { title: '4-4 Cover 3 Strengths & Weaknesses', url: 'https://vimeo.com/1000619154/1e12e1088b', category: 'coverage', tags: ['Cover 3', '4-4', 'S&W'], priority: 2 },
+  { title: '4-4 Cover 3 Backers Responsibilities', url: 'https://vimeo.com/1000615091/1b8a616598', category: 'coverage', tags: ['Cover 3', '4-4', 'LB'], priority: 3 },
+
+  // COVER 4 FAMILY
+  { title: 'Cover 4 Overview', url: 'https://vimeo.com/1000613764/399dc21079', category: 'coverage', tags: ['Cover 4', 'Overview'], priority: 1 },
+  { title: 'Cover 4 Strengths & Weaknesses', url: 'https://vimeo.com/1000615029/06a0ba095b', category: 'coverage', tags: ['Cover 4', 'S&W'], priority: 1 },
+  { title: 'Cover 4 Lock', url: 'https://vimeo.com/1000620092/9bcdc03fe3', category: 'coverage', tags: ['Cover 4', 'Variant'], priority: 2 },
+  { title: 'Cover 4 Press', url: 'https://vimeo.com/1000615735/4aea826057', category: 'coverage', tags: ['Cover 4', 'Variant'], priority: 2 },
+  { title: 'Cover 4 Cut', url: 'https://vimeo.com/1000614506/900c7d0a60', category: 'coverage', tags: ['Cover 4', 'Variant'], priority: 2 },
+  { title: 'Cover 4 Read', url: 'https://vimeo.com/1000620164/0bce981e47', category: 'coverage', tags: ['Cover 4', 'Variant'], priority: 2 },
+
+  // COVER 1 FAMILY
+  { title: 'Cover 1 Man Overview', url: 'https://vimeo.com/1000619378/9b7c696346', category: 'coverage', tags: ['Cover 1', 'Man', 'Overview'], priority: 1 },
+  { title: 'Cover 1 Robber', url: 'https://vimeo.com/1000619519/306b71d94e', category: 'coverage', tags: ['Cover 1', 'Variant'], priority: 2 },
+  { title: 'Cover 1 Double', url: 'https://vimeo.com/1000614426/fbdee6ff3f', category: 'coverage', tags: ['Cover 1', 'Variant'], priority: 2 },
+  { title: 'Cover 1 Bandit', url: 'https://vimeo.com/1000614638/aec0dce551', category: 'coverage', tags: ['Cover 1', 'Variant'], priority: 2 },
+  { title: 'Cover 1 Double Lurk', url: 'https://vimeo.com/1000613724/0779c45d7e', category: 'coverage', tags: ['Cover 1', 'Variant'], priority: 3 },
+  { title: 'Cover 1 Double Robber', url: 'https://vimeo.com/1000613910/5bf205ef0b', category: 'coverage', tags: ['Cover 1', 'Variant'], priority: 3 },
+
+  // COVER 0
+  { title: 'Cover 0 Overview', url: 'https://vimeo.com/1000613674/37d18a765d', category: 'coverage', tags: ['Cover 0', 'Blitz', 'Overview'], priority: 1 },
+
+  // COVER 6
+  { title: 'Cover 6 Overview', url: 'https://vimeo.com/1000620256/3bc87633f2', category: 'coverage', tags: ['Cover 6', 'Overview'], priority: 2 },
+
+  // DEFENSIVE FRONTS
+  { title: 'Defensive Fronts Overview', url: 'https://vimeo.com/1000620337/7327af7608', category: 'front', tags: ['Fronts', 'Overview'], priority: 1 },
+  { title: 'How & Why Defensive Fronts are Named', url: 'https://vimeo.com/1000620466/6b548482e4', category: 'front', tags: ['Fronts', 'Fundamentals'], priority: 1 },
+  { title: '4-3 Over Defensive Front', url: 'https://vimeo.com/1000614378/e1f01d2b3a', category: 'front', tags: ['4-3', 'Even Front'], priority: 1 },
+  { title: '4-3 Under Defensive Front', url: 'https://vimeo.com/1000615419/53e6cfc15c', category: 'front', tags: ['4-3', 'Even Front'], priority: 2 },
+  { title: '4-3 Over Wide 9 Defensive Front', url: 'https://vimeo.com/1000613856/bdeb928819', category: 'front', tags: ['4-3', 'Wide 9'], priority: 2 },
+  { title: '3-4 Okie Defensive Front', url: 'https://vimeo.com/1000614318/c52820ac64', category: 'front', tags: ['3-4', 'Odd Front', 'Okie'], priority: 1 },
+  { title: '3-4 Eagle Defensive Front', url: 'https://vimeo.com/1000614722/3b06bc8cfc', category: 'front', tags: ['3-4', 'Odd Front', 'Eagle'], priority: 2 },
+  { title: '3-4 Under Defensive Front', url: 'https://vimeo.com/1000614790/a19ffb43ed', category: 'front', tags: ['3-4', 'Odd Front'], priority: 2 },
+  { title: '3-4 Bear Defensive Front', url: 'https://vimeo.com/1000614234/5c8e2dd35e', category: 'front', tags: ['Bear', 'Odd Front'], priority: 2 },
+  { title: '3-3 Stack Defensive Front', url: 'https://vimeo.com/1000614563/b754f4eeea', category: 'front', tags: ['Stack', 'Odd Front'], priority: 2 },
 ];
 
-function getRank(overall) {
-  let rank = 'Scout Team';
-  for (const r of RANKS) { if (overall >= r.min) rank = r.label; }
-  return rank;
+const CATEGORIES = [
+  { id: 'comparison', label: 'ID Keys & Comparisons', icon: '🔍', desc: 'Learn to tell coverages apart' },
+  { id: 'coverage', label: 'Coverage Families', icon: '🛡', desc: 'Deep dives on every coverage' },
+  { id: 'front', label: 'Defensive Fronts', icon: '💪', desc: 'Read the box and identify fronts' },
+];
+
+let currentFilter = 'all';
+let currentVideoIdx = 0;
+let filteredVideos = [...VIDEOS];
+let watched = JSON.parse(localStorage.getItem('sqb_watched') || '[]');
+
+function getVimeoEmbedUrl(url) {
+  const match = url.match(/vimeo\.com\/(\d+)\/([a-f0-9]+)/);
+  if (match) return `https://player.vimeo.com/video/${match[1]}?h=${match[2]}&autoplay=1&title=0&byline=0&portrait=0`;
+  const match2 = url.match(/vimeo\.com\/(\d+)/);
+  if (match2) return `https://player.vimeo.com/video/${match2[1]}?autoplay=1&title=0&byline=0&portrait=0`;
+  return url;
 }
 
-async function init() {
-  const user = await requireAuth();
-  if (!user) return;
-  document.getElementById('nav-user').textContent = user.email;
+function getTagClass(tag) {
+  const coverageTags = ['Cover 0','Cover 1','Cover 2','Cover 3','Cover 4','Cover 6','Tampa 2','2-Man','Man Coverage'];
+  const frontTags = ['4-3','3-4','Bear','Eagle','Okie','Stack','Fronts'];
+  if (coverageTags.some(t => tag.includes(t))) return 'coverage';
+  if (frontTags.some(t => tag.includes(t))) return 'front';
+  if (tag === 'ID Keys' || tag === 'S&W' || tag === 'Comparison') return 'comparison';
+  return 'concept';
+}
 
-  const profile = await getProfile(user.id);
-  if (!profile) { window.location.href = 'index.html'; return; }
+function setFilter(filter, btn) {
+  currentFilter = filter;
+  document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  filterVideos();
+}
 
-  document.getElementById('loading').classList.add('hidden');
-  document.getElementById('content').classList.remove('hidden');
+function filterVideos() {
+  const query = document.getElementById('search-input').value.toLowerCase().trim();
+  filteredVideos = VIDEOS.filter(v => {
+    const matchesFilter = currentFilter === 'all' || v.category === currentFilter;
+    const matchesSearch = !query ||
+      v.title.toLowerCase().includes(query) ||
+      v.tags.some(t => t.toLowerCase().includes(query));
+    return matchesFilter && matchesSearch;
+  });
+  renderLibrary();
+}
 
-  const name = profile.full_name || 'Signal Caller';
-  const firstName = name.split(' ')[0];
-  document.getElementById('greeting').textContent = `Welcome back, ${firstName}`;
-  document.getElementById('lr-name').textContent = name;
-  document.getElementById('lr-overall').textContent = profile.overall;
-  document.getElementById('lr-rank').textContent = getRank(profile.overall);
+function renderLibrary() {
+  const content = document.getElementById('library-content');
+  if (filteredVideos.length === 0) {
+    content.innerHTML = `
+      <div class="no-results">
+        <div class="no-results-icon">📋</div>
+        <h3 class="mb-8">No videos found</h3>
+        <p class="text-muted">Try a different search term or filter</p>
+      </div>`;
+    return;
+  }
 
-  const xpPct = Math.min(100, (profile.xp % 1000) / 10);
-  document.getElementById('lr-xp-bar').style.width = xpPct + '%';
-  document.getElementById('lr-xp-pct').textContent = Math.round(xpPct) + '%';
-  const nextRank = RANKS.find(r => r.min > profile.overall) || { label: 'Max Rank' };
-  document.getElementById('lr-xp-label').textContent = `${profile.xp % 1000} / 1000 XP to ${nextRank.label}`;
+  const isSearching = document.getElementById('search-input').value.trim();
 
-  const attrsList = document.getElementById('attrs-list');
-  ATTRS.forEach(a => {
-    const val = profile[a.key] || 60;
-    attrsList.innerHTML += `
-      <div class="attr-row">
-        <div class="attr-name">${a.label}</div>
-        <div class="attr-val" style="color:var(--${a.color === 'blue' ? 'blue' : a.color === 'red' ? 'red' : 'green'})">${val}</div>
-        <div class="attr-bar"><div class="attr-fill" style="width:${val}%;background:var(--${a.color === 'blue' ? 'blue' : a.color === 'red' ? 'red' : 'green'})"></div></div>
+  if (isSearching || currentFilter !== 'all') {
+    content.innerHTML = `
+      <div class="category-section">
+        <div class="video-grid">
+          ${filteredVideos.map((v, i) => renderVideoCard(v, VIDEOS.indexOf(v))).join('')}
+        </div>
+      </div>`;
+    return;
+  }
+
+  let html = '';
+  CATEGORIES.forEach(cat => {
+    const catVideos = VIDEOS.filter(v => v.category === cat.id);
+    if (catVideos.length === 0) return;
+    html += `
+      <div class="category-section">
+        <div class="category-header">
+          <div class="category-icon">${cat.icon}</div>
+          <div>
+            <div class="category-name">${cat.label}</div>
+          </div>
+          <div class="category-count">${catVideos.length} videos</div>
+        </div>
+        <div class="video-grid">
+          ${catVideos.map(v => renderVideoCard(v, VIDEOS.indexOf(v))).join('')}
+        </div>
       </div>`;
   });
+  content.innerHTML = html;
+}
 
-  const lowestAttr = ATTRS.reduce((a, b) => (profile[a.key] || 60) < (profile[b.key] || 60) ? a : b);
-  document.getElementById('scout-text').innerHTML =
-    `Your biggest weakness right now: <strong>${lowestAttr.label} (${profile[lowestAttr.key] || 60})</strong>. Today's sessions will prioritize coverages tied to this skill. Study the pre-snap keys before the snap.`;
+function renderVideoCard(v, idx) {
+  const isWatched = watched.includes(idx);
+  return `
+    <div class="video-card ${isWatched ? 'watched' : ''}" onclick="openVideo(${idx})">
+      <div class="video-thumb">
+        <div class="video-thumb-placeholder">
+          <div class="play-btn">
+            <div class="play-arrow"></div>
+          </div>
+        </div>
+        ${isWatched ? '<div style="position:absolute;top:8px;right:8px;background:rgba(178,255,0,0.9);border-radius:20px;padding:2px 8px;font-family:Roboto Mono,monospace;font-size:8px;text-transform:uppercase;letter-spacing:0.06em;color:#000">✓ Watched</div>' : ''}
+      </div>
+      <div class="video-info">
+        <div class="video-title">${v.title}</div>
+        <div class="video-tags">
+          ${v.tags.map(t => `<span class="video-tag ${getTagClass(t)}">${t}</span>`).join('')}
+        </div>
+      </div>
+    </div>`;
+}
 
-  if (profile.is_admin) document.getElementById('admin-section').classList.remove('hidden');
+function openVideo(idx) {
+  const video = VIDEOS[idx];
+  currentVideoIdx = idx;
+  document.getElementById('modal-title').textContent = video.title;
+  document.getElementById('modal-iframe').src = getVimeoEmbedUrl(video.url);
+  document.getElementById('modal-tags').innerHTML = video.tags.map(t => `<span class="video-tag ${getTagClass(t)}">${t}</span>`).join('');
+  document.getElementById('prev-btn').disabled = idx === 0;
+  document.getElementById('next-btn').disabled = idx === VIDEOS.length - 1;
+  document.getElementById('modal').classList.add('show');
+  document.body.style.overflow = 'hidden';
+  markWatched(idx);
+}
 
-  const earned = profile.badges ? JSON.parse(profile.badges) : [];
-  if (earned.includes('coverage_rookie')) { /* mark first badge */ }
-  if (profile.overall >= 85) earned.push('signal_caller');
-  if (profile.overall >= 95) earned.push('legend');
-  const badgesWrap = document.getElementById('badges-wrap');
-  BADGES_DEF.forEach(b => {
-    const isEarned = earned.includes(b.id);
-    badgesWrap.innerHTML += `<div class="badge ${isEarned ? 'badge-green' : ''}" title="${b.desc}">${isEarned ? '✓ ' : ''}${b.label}</div>`;
-  });
+function closeModal() {
+  document.getElementById('modal').classList.remove('show');
+  document.getElementById('modal-iframe').src = '';
+  document.body.style.overflow = '';
+}
 
-  const { data: attempts } = await db.from('attempts')
-    .select('coverage_id, correct, created_at')
-    .eq('player_id', user.id)
-    .order('created_at', { ascending: false })
-    .limit(8);
-  if (attempts && attempts.length > 0) {
-    const recentList = document.getElementById('recent-list');
-    recentList.innerHTML = attempts.map(a => `
-      <div class="recent-row">
-        <div class="recent-dot ${a.correct ? 'correct' : 'wrong'}"></div>
-        <div class="recent-coverage">${a.coverage_id || 'Coverage'}</div>
-        <div class="recent-result">${a.correct ? 'Correct read' : 'Missed read'}</div>
-        <div class="recent-time">${timeAgo(a.created_at)}</div>
-      </div>`).join('');
+function handleModalClick(e) {
+  if (e.target === document.getElementById('modal')) closeModal();
+}
+
+function navVideo(dir) {
+  const newIdx = currentVideoIdx + dir;
+  if (newIdx >= 0 && newIdx < VIDEOS.length) openVideo(newIdx);
+}
+
+function markWatched(idx) {
+  if (!watched.includes(idx)) {
+    watched.push(idx);
+    localStorage.setItem('sqb_watched', JSON.stringify(watched));
+    updateProgress();
+    renderLibrary();
   }
 }
 
-function timeAgo(ts) {
-  const diff = Date.now() - new Date(ts).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
+function updateProgress() {
+  const count = watched.length;
+  const pct = Math.round(count / VIDEOS.length * 100);
+  document.getElementById('watched-count').textContent = `${count} / ${VIDEOS.length}`;
+  document.getElementById('watched-bar').style.width = pct + '%';
 }
 
-async function signOut() {
-  await db.auth.signOut();
-  window.location.href = 'index.html';
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeModal();
+  if (e.key === 'ArrowRight') navVideo(1);
+  if (e.key === 'ArrowLeft') navVideo(-1);
+});
+
+async function init() {
+  // Give Supabase session time to restore before checking auth
+  await new Promise(resolve => setTimeout(resolve, 100));
+  const user = await getUser();
+  if (!user) {
+    window.location.href = 'index.html';
+    return;
+  }
+  updateProgress();
+  renderLibrary();
 }
 
 init();

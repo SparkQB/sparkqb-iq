@@ -328,6 +328,7 @@
 </div>
 
 <script src="js/supabase.js"></script>
+<script src="js/curriculum.js"></script>
 <script>
 const VIDEOS = [
   // COMPARISONS
@@ -429,14 +430,65 @@ function setFilter(filter, btn) {
   filterVideos();
 }
 
+function getCurriculumSearchText(v) {
+  if (typeof CURRICULUM === 'undefined') return '';
+  const searchParts = [];
+
+  // Search across all coverages whose name appears in the video title or tags
+  const coverageKeys = Object.keys(CURRICULUM.coverages || {});
+  coverageKeys.forEach(key => {
+    const isRelated = v.title.toLowerCase().includes(key.toLowerCase()) ||
+      v.tags.some(t => t.toLowerCase().includes(key.toLowerCase()));
+    if (isRelated) {
+      const cov = CURRICULUM.coverages[key];
+      if (cov.pre_snap_keys) searchParts.push(...cov.pre_snap_keys);
+      if (cov.post_snap_confirm) searchParts.push(...cov.post_snap_confirm);
+      if (cov.biggest_mistake) searchParts.push(cov.biggest_mistake);
+      if (cov.film_review) searchParts.push(cov.film_review);
+      if (cov.weaknesses) searchParts.push(...cov.weaknesses);
+      if (cov.strengths) searchParts.push(...cov.strengths);
+      if (cov.concepts_that_beat) searchParts.push(...cov.concepts_that_beat.map(c => c.concept + ' ' + c.why));
+    }
+  });
+
+  // Search fronts
+  const frontKeys = Object.keys(CURRICULUM.fronts || {});
+  frontKeys.forEach(key => {
+    const front = CURRICULUM.fronts[key];
+    if (!front.title) return;
+    const isRelated = v.title.toLowerCase().includes(key.toLowerCase()) ||
+      v.tags.some(t => t.toLowerCase().includes(key.toLowerCase()));
+    if (isRelated) {
+      if (front.identification) searchParts.push(...front.identification);
+      if (front.gap_control) searchParts.push(...front.gap_control);
+      if (front.qb_read) searchParts.push(front.qb_read);
+    }
+  });
+
+  // Always include global coaching phrases
+  if (CURRICULUM.coaching_phrases) searchParts.push(...CURRICULUM.coaching_phrases);
+
+  return searchParts.join(' ').toLowerCase();
+}
+
+// Build curriculum search index once on load
+const curriculumIndex = {};
+
+function buildSearchIndex() {
+  VIDEOS.forEach((v, idx) => {
+    curriculumIndex[idx] = getCurriculumSearchText(v);
+  });
+}
+
 function filterVideos() {
   const query = document.getElementById('search-input').value.toLowerCase().trim();
-  filteredVideos = VIDEOS.filter(v => {
+  filteredVideos = VIDEOS.filter((v, idx) => {
     const matchesFilter = currentFilter === 'all' || v.category === currentFilter;
-    const matchesSearch = !query ||
-      v.title.toLowerCase().includes(query) ||
-      v.tags.some(t => t.toLowerCase().includes(query));
-    return matchesFilter && matchesSearch;
+    if (!query) return matchesFilter;
+    const matchesTitle = v.title.toLowerCase().includes(query);
+    const matchesTags = v.tags.some(t => t.toLowerCase().includes(query));
+    const matchesCurriculum = curriculumIndex[idx] && curriculumIndex[idx].includes(query);
+    return matchesFilter && (matchesTitle || matchesTags || matchesCurriculum);
   });
   renderLibrary();
 }
@@ -513,13 +565,16 @@ async function fetchThumb(url, idx) {
 
 function renderVideoCard(v, idx) {
   const isWatched = watched.includes(idx);
-  // Kick off thumbnail fetch asynchronously
-  fetchThumb(v.url, idx);
+  // Use cached thumbnail immediately if available, otherwise fetch
+  const cachedThumb = thumbCache[idx] || null;
+  if (!cachedThumb) fetchThumb(v.url, idx);
+  const imgStyle = cachedThumb ? 'display:block;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;' : 'display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;';
+  const placeholderStyle = cachedThumb ? 'display:none;' : '';
   return `
     <div class="video-card ${isWatched ? 'watched' : ''}" onclick="openVideo(${idx})">
       <div class="video-thumb">
-        <img id="thumb-${idx}" src="" alt="${v.title}" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
-        <div class="video-thumb-placeholder" id="placeholder-${idx}">
+        <img id="thumb-${idx}" src="${cachedThumb || ''}" alt="${v.title}" style="${imgStyle}">
+        <div class="video-thumb-placeholder" id="placeholder-${idx}" style="${placeholderStyle}">
           <div class="play-btn">
             <div class="play-arrow"></div>
           </div>
@@ -598,6 +653,7 @@ async function init() {
     window.location.href = 'index.html';
     return;
   }
+  buildSearchIndex();
   updateProgress();
   renderLibrary();
 }
